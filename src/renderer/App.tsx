@@ -305,13 +305,15 @@ export default function App() {
     }
   };
 
-  const handleRemoveWorktree = async (worktree: GitWorktree) => {
+  const handleRemoveWorktree = async (worktree: GitWorktree, deleteBranch?: boolean) => {
     if (!selectedRepo) return;
     await removeWorktreeMutation.mutateAsync({
       workdir: selectedRepo,
       options: {
         path: worktree.path,
         force: worktree.prunable, // prunable 的直接 prune，否则 force remove
+        deleteBranch,
+        branch: worktree.branch || undefined,
       },
     });
     // 如果删除的是当前选中的，清空选择

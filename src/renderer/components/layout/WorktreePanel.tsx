@@ -18,7 +18,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -32,7 +31,7 @@ interface WorktreePanelProps {
   isCreating?: boolean;
   onSelectWorktree: (worktree: GitWorktree) => void;
   onCreateWorktree: (options: WorktreeCreateOptions) => Promise<void>;
-  onRemoveWorktree: (worktree: GitWorktree) => Promise<void>;
+  onRemoveWorktree: (worktree: GitWorktree, deleteBranch?: boolean) => Promise<void>;
   onRefresh: () => void;
   width?: number;
   collapsed?: boolean;
@@ -60,6 +59,7 @@ export function WorktreePanel({
 }: WorktreePanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [worktreeToDelete, setWorktreeToDelete] = useState<GitWorktree | null>(null);
+  const [deleteBranch, setDeleteBranch] = useState(false);
 
   const filteredWorktrees = worktrees.filter(
     (wt) =>
@@ -169,7 +169,12 @@ export function WorktreePanel({
       {/* Delete confirmation dialog */}
       <AlertDialog
         open={!!worktreeToDelete}
-        onOpenChange={(open) => !open && setWorktreeToDelete(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWorktreeToDelete(null);
+            setDeleteBranch(false);
+          }
+        }}
       >
         <AlertDialogPopup>
           <AlertDialogHeader>
@@ -187,14 +192,26 @@ export function WorktreePanel({
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {worktreeToDelete?.branch && !worktreeToDelete?.isMainWorktree && (
+            <label className="flex items-center gap-2 px-6 py-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={deleteBranch}
+                onChange={(e) => setDeleteBranch(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+              <span>同时删除分支 <strong>{worktreeToDelete.branch}</strong></span>
+            </label>
+          )}
           <AlertDialogFooter>
             <AlertDialogClose render={<Button variant="outline">取消</Button>} />
             <Button
               variant="destructive"
               onClick={async () => {
                 if (worktreeToDelete) {
-                  await onRemoveWorktree(worktreeToDelete);
+                  await onRemoveWorktree(worktreeToDelete, deleteBranch);
                   setWorktreeToDelete(null);
+                  setDeleteBranch(false);
                 }
               }}
             >
@@ -221,10 +238,6 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
     worktree.isMainWorktree || worktree.branch === 'main' || worktree.branch === 'master';
   const branchDisplay = worktree.branch || 'detached';
   const isPrunable = worktree.prunable;
-
-  // Mock data for display
-  const lastAccessed = 'Last accessed now';
-  const agentSession = 'Claude';
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -280,22 +293,6 @@ function WorktreeItem({ worktree, isActive, onClick, onDelete }: WorktreeItemPro
         >
           {worktree.path}
         </div>
-
-        {/* Meta info - hide for prunable */}
-        {!isPrunable && (
-          <div
-            className={cn(
-              'flex w-full items-center gap-3 pl-6 pt-1 text-xs',
-              isActive ? 'text-accent-foreground/70' : 'text-muted-foreground'
-            )}
-          >
-            <span>{lastAccessed}</span>
-            <div className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              <span>{agentSession}</span>
-            </div>
-          </div>
-        )}
       </button>
 
       {/* Context Menu */}

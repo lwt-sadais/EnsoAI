@@ -27,7 +27,7 @@ export class WorktreeService {
       } else if (line.startsWith('HEAD ')) {
         current.head = line.substring(5);
       } else if (line.startsWith('branch ')) {
-        current.branch = line.substring(7);
+        current.branch = line.substring(7).replace('refs/heads/', '');
       } else if (line === 'bare') {
         current.isMainWorktree = true;
       } else if (line === 'locked') {
@@ -74,6 +74,11 @@ export class WorktreeService {
 
     args.push(options.path);
     await this.git.raw(args);
+
+    // Delete branch if requested
+    if (options.deleteBranch && options.branch) {
+      await this.git.raw(['branch', '-D', options.branch]);
+    }
   }
 
   async prune(): Promise<void> {

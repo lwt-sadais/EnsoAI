@@ -35,7 +35,7 @@ export function WorktreeCard({
   onCopyPath,
   onRemove,
 }: WorktreeCardProps) {
-  const branchName = worktree.branch?.replace('refs/heads/', '') || 'detached HEAD';
+  const branchName = worktree.branch || 'detached HEAD';
   const hasChanges = status && !status.isClean;
   const changedFilesCount = status
     ? status.staged.length + status.modified.length + status.untracked.length
