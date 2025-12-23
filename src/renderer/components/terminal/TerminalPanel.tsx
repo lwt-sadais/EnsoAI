@@ -13,8 +13,8 @@ interface TerminalPanelProps {
 }
 
 function createInitialState(): { tabs: TerminalTab[]; activeId: string | null } {
-  const defaultTab = { id: crypto.randomUUID(), name: 'Untitled-1' };
-  return { tabs: [defaultTab], activeId: defaultTab.id };
+  // Start with empty tabs - will create first tab when cwd is available
+  return { tabs: [], activeId: null };
 }
 
 function getNextName(tabs: TerminalTab[]): string {
@@ -36,6 +36,16 @@ export function TerminalPanel({ cwd }: TerminalPanelProps) {
   const [editingName, setEditingName] = useState('');
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const initializedRef = useRef(false);
+
+  // Create initial tab when cwd becomes available
+  useEffect(() => {
+    if (cwd && !initializedRef.current) {
+      initializedRef.current = true;
+      const defaultTab = { id: crypto.randomUUID(), name: 'Untitled-1' };
+      setState({ tabs: [defaultTab], activeId: defaultTab.id });
+    }
+  }, [cwd]);
 
   // Stable terminal IDs - only append, never reorder (prevents DOM reordering issues with xterm)
   const [terminalIds, setTerminalIds] = useState<string[]>(() => tabs.map(t => t.id));
