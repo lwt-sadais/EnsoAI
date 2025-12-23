@@ -3,12 +3,16 @@ import { persist } from 'zustand/middleware';
 
 export type Theme = 'light' | 'dark' | 'system';
 
+export type FontWeight = 'normal' | 'bold' | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900';
+
 interface SettingsState {
   theme: Theme;
   fontSize: number;
   fontFamily: string;
   terminalFontSize: number;
   terminalFontFamily: string;
+  terminalFontWeight: FontWeight;
+  terminalFontWeightBold: FontWeight;
   terminalTheme: string; // Ghostty theme name
 
   setTheme: (theme: Theme) => void;
@@ -16,6 +20,8 @@ interface SettingsState {
   setFontFamily: (family: string) => void;
   setTerminalFontSize: (size: number) => void;
   setTerminalFontFamily: (family: string) => void;
+  setTerminalFontWeight: (weight: FontWeight) => void;
+  setTerminalFontWeightBold: (weight: FontWeight) => void;
   setTerminalTheme: (theme: string) => void;
 }
 
@@ -35,8 +41,10 @@ export const useSettingsStore = create<SettingsState>()(
       theme: 'system',
       fontSize: 14,
       fontFamily: 'Inter',
-      terminalFontSize: 14,
-      terminalFontFamily: 'JetBrains Mono',
+      terminalFontSize: 18,
+      terminalFontFamily: 'Maple Mono NF CN, JetBrains Mono, Menlo, Monaco, monospace',
+      terminalFontWeight: 'normal',
+      terminalFontWeightBold: '500',
       terminalTheme: 'Dracula',
 
       setTheme: (theme) => {
@@ -47,6 +55,8 @@ export const useSettingsStore = create<SettingsState>()(
       setFontFamily: (fontFamily) => set({ fontFamily }),
       setTerminalFontSize: (terminalFontSize) => set({ terminalFontSize }),
       setTerminalFontFamily: (terminalFontFamily) => set({ terminalFontFamily }),
+      setTerminalFontWeight: (terminalFontWeight) => set({ terminalFontWeight }),
+      setTerminalFontWeightBold: (terminalFontWeightBold) => set({ terminalFontWeightBold }),
       setTerminalTheme: (terminalTheme) => set({ terminalTheme }),
     }),
     {

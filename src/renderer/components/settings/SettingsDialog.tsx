@@ -10,7 +10,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Palette, Settings, Monitor, Sun, Moon, Terminal, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useSettingsStore, type Theme } from '@/stores/settings';
+import { useSettingsStore, type Theme, type FontWeight } from '@/stores/settings';
+import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectPopup, SelectItem } from '@/components/ui/select';
 import {
   Combobox,
   ComboboxInput,
@@ -34,22 +36,29 @@ const categories: Array<{ id: SettingsCategory; icon: React.ElementType; label: 
 
 interface SettingsDialogProps {
   trigger?: React.ReactElement;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function SettingsDialog({ trigger }: SettingsDialogProps) {
+export function SettingsDialog({ trigger, open, onOpenChange }: SettingsDialogProps) {
   const [activeCategory, setActiveCategory] = React.useState<SettingsCategory>('appearance');
 
+  // Controlled mode (open prop provided) doesn't need trigger
+  const isControlled = open !== undefined;
+
   return (
-    <Dialog>
-      <DialogTrigger
-        render={
-          trigger ?? (
-            <Button variant="ghost" size="icon">
-              <Settings className="h-4 w-4" />
-            </Button>
-          )
-        }
-      />
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {!isControlled && (
+        <DialogTrigger
+          render={
+            trigger ?? (
+              <Button variant="ghost" size="icon">
+                <Settings className="h-4 w-4" />
+              </Button>
+            )
+          }
+        />
+      )}
       <DialogPopup className="sm:max-w-2xl" showCloseButton={true}>
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
@@ -132,8 +141,33 @@ function AppearanceSettings() {
   );
 }
 
+const fontWeightOptions: { value: FontWeight; label: string }[] = [
+  { value: 'normal', label: 'Normal' },
+  { value: '100', label: '100 (Thin)' },
+  { value: '200', label: '200 (Extra Light)' },
+  { value: '300', label: '300 (Light)' },
+  { value: '400', label: '400 (Regular)' },
+  { value: '500', label: '500 (Medium)' },
+  { value: '600', label: '600 (Semi Bold)' },
+  { value: '700', label: '700 (Bold)' },
+  { value: '800', label: '800 (Extra Bold)' },
+  { value: '900', label: '900 (Black)' },
+  { value: 'bold', label: 'Bold' },
+];
+
 function TerminalSettings() {
-  const { terminalTheme, setTerminalTheme } = useSettingsStore();
+  const {
+    terminalTheme,
+    setTerminalTheme,
+    terminalFontSize,
+    setTerminalFontSize,
+    terminalFontFamily,
+    setTerminalFontFamily,
+    terminalFontWeight,
+    setTerminalFontWeight,
+    terminalFontWeightBold,
+    setTerminalFontWeightBold,
+  } = useSettingsStore();
 
   // Get theme names synchronously from embedded data
   const themeNames = React.useMemo(() => getThemeNames(), []);
@@ -166,39 +200,121 @@ function TerminalSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
+      {/* Preview at top */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">预览</p>
+        <TerminalPreview
+          theme={previewTheme}
+          fontSize={terminalFontSize}
+          fontFamily={terminalFontFamily}
+          fontWeight={terminalFontWeight}
+        />
+      </div>
+
+      {/* Theme Section */}
+      <div className="border-t pt-6">
         <h3 className="text-lg font-medium">终端主题</h3>
         <p className="text-sm text-muted-foreground">选择终端配色方案</p>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevTheme}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <div className="flex-1">
-            <ThemeCombobox
-              value={terminalTheme}
-              onValueChange={handleThemeChange}
-              themes={themeNames}
-            />
-          </div>
-          <Button variant="outline" size="icon" onClick={handleNextTheme}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="icon" onClick={handlePrevTheme}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="flex-1">
+          <ThemeCombobox
+            value={terminalTheme}
+            onValueChange={handleThemeChange}
+            themes={themeNames}
+          />
+        </div>
+        <Button variant="outline" size="icon" onClick={handleNextTheme}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Font Section */}
+      <div className="border-t pt-6">
+        <h3 className="text-lg font-medium">字体设置</h3>
+        <p className="text-sm text-muted-foreground">自定义终端字体样式</p>
+      </div>
+
+      <div className="grid gap-4">
+        {/* Font Family */}
+        <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+          <label className="text-sm font-medium">字体</label>
+          <Input
+            value={terminalFontFamily}
+            onChange={(e) => setTerminalFontFamily(e.target.value)}
+            placeholder="JetBrains Mono, monospace"
+          />
         </div>
 
-        {/* Theme Preview */}
-        <div className="space-y-2">
-          <p className="text-sm font-medium">预览</p>
-          <TerminalPreview theme={previewTheme} />
+        {/* Font Size */}
+        <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+          <label className="text-sm font-medium">字号</label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={terminalFontSize}
+              onChange={(e) => setTerminalFontSize(Number(e.target.value))}
+              min={8}
+              max={32}
+              className="w-20"
+            />
+            <span className="text-sm text-muted-foreground">px</span>
+          </div>
+        </div>
+
+        {/* Font Weight */}
+        <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+          <label className="text-sm font-medium">字重</label>
+          <Select value={terminalFontWeight} onValueChange={(v) => setTerminalFontWeight(v as FontWeight)}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup>
+              {fontWeightOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
+        </div>
+
+        {/* Font Weight Bold */}
+        <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+          <label className="text-sm font-medium">粗体字重</label>
+          <Select value={terminalFontWeightBold} onValueChange={(v) => setTerminalFontWeightBold(v as FontWeight)}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectPopup>
+              {fontWeightOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectPopup>
+          </Select>
         </div>
       </div>
     </div>
   );
 }
 
-function TerminalPreview({ theme }: { theme: XtermTheme }) {
+function TerminalPreview({
+  theme,
+  fontSize,
+  fontFamily,
+  fontWeight,
+}: {
+  theme: XtermTheme;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: string;
+}) {
   const sampleLines = [
     { text: '$ ', color: theme.green },
     { text: 'ls -la', color: theme.foreground },
@@ -223,8 +339,8 @@ function TerminalPreview({ theme }: { theme: XtermTheme }) {
 
   return (
     <div
-      className="rounded-lg border p-4 font-mono text-sm"
-      style={{ backgroundColor: theme.background }}
+      className="rounded-lg border p-4 h-40 overflow-auto"
+      style={{ backgroundColor: theme.background, fontSize: `${fontSize}px`, fontFamily, fontWeight }}
     >
       {sampleLines.map((segment, i) =>
         segment.text === '\n' ? (

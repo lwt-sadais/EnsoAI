@@ -19,12 +19,27 @@ interface ClaudeTerminalProps {
   onExit?: () => void;
 }
 
-// Hook to get terminal theme from settings (synchronous, uses embedded data)
-function useTerminalTheme(): XtermTheme {
-  const { terminalTheme } = useSettingsStore();
-  return useMemo(() => {
+// Hook to get terminal settings from store
+function useTerminalSettings() {
+  const {
+    terminalTheme,
+    terminalFontSize,
+    terminalFontFamily,
+    terminalFontWeight,
+    terminalFontWeightBold,
+  } = useSettingsStore();
+
+  const theme = useMemo(() => {
     return getXtermTheme(terminalTheme) ?? defaultDarkTheme;
   }, [terminalTheme]);
+
+  return {
+    theme,
+    fontSize: terminalFontSize,
+    fontFamily: terminalFontFamily,
+    fontWeight: terminalFontWeight,
+    fontWeightBold: terminalFontWeightBold,
+  };
 }
 
 export function ClaudeTerminal({
@@ -37,7 +52,7 @@ export function ClaudeTerminal({
 }: ClaudeTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
-  const currentTheme = useTerminalTheme();
+  const settings = useTerminalSettings();
   const fitAddonRef = useRef<FitAddon | null>(null);
   const ptyIdRef = useRef<string | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -60,11 +75,11 @@ export function ClaudeTerminal({
     const terminal = new Terminal({
       cursorBlink: true,
       cursorStyle: 'bar',
-      fontSize: 18,
-      fontFamily: 'Maple Mono NF CN, JetBrains Mono, Menlo, Monaco, monospace',
-      fontWeight: 'normal',
-      fontWeightBold: '500',
-      theme: currentTheme,
+      fontSize: settings.fontSize,
+      fontFamily: settings.fontFamily,
+      fontWeight: settings.fontWeight,
+      fontWeightBold: settings.fontWeightBold,
+      theme: settings.theme,
     });
 
     const fitAddon = new FitAddon();
@@ -173,12 +188,20 @@ export function ClaudeTerminal({
     };
   }, []);
 
-  // Update theme dynamically when settings change
+  // Update settings dynamically when they change
   useEffect(() => {
     if (terminalRef.current) {
-      terminalRef.current.options.theme = currentTheme;
+      terminalRef.current.options.theme = settings.theme;
+      terminalRef.current.options.fontSize = settings.fontSize;
+      terminalRef.current.options.fontFamily = settings.fontFamily;
+      terminalRef.current.options.fontWeight = settings.fontWeight;
+      terminalRef.current.options.fontWeightBold = settings.fontWeightBold;
+      // Refit after font changes
+      if (fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
     }
-  }, [currentTheme]);
+  }, [settings]);
 
   // Handle resize
   useEffect(() => {
@@ -224,7 +247,7 @@ export function ClaudeTerminal({
   }, []);
 
   return (
-    <div className="relative h-full w-full" style={{ backgroundColor: currentTheme.background }}>
+    <div className="relative h-full w-full" style={{ backgroundColor: settings.theme.background }}>
       <div
         ref={containerRef}
         className="h-full w-full px-[10px] py-[2px]"
@@ -234,9 +257,9 @@ export function ClaudeTerminal({
           <div className="flex flex-col items-center gap-3">
             <div
               className="h-6 w-6 animate-spin rounded-full border-2 border-current border-t-transparent"
-              style={{ color: currentTheme.foreground, opacity: 0.5 }}
+              style={{ color: settings.theme.foreground, opacity: 0.5 }}
             />
-            <span style={{ color: currentTheme.foreground, opacity: 0.5 }} className="text-sm">
+            <span style={{ color: settings.theme.foreground, opacity: 0.5 }} className="text-sm">
               Loading Claude...
             </span>
           </div>

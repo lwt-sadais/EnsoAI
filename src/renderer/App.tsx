@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WorkspaceSidebar } from './components/layout/WorkspaceSidebar';
 import { WorktreePanel } from './components/layout/WorktreePanel';
 import { MainContent } from './components/layout/MainContent';
+import { SettingsDialog } from './components/settings/SettingsDialog';
 import { useWorkspaceStore } from './stores/workspace';
 import { useSettingsStore } from './stores/settings';
 import { useWorktreeList, useWorktreeCreate, useWorktreeRemove } from './hooks/useWorktree';
@@ -50,6 +51,9 @@ export default function App() {
   const [workspaceCollapsed, setWorkspaceCollapsed] = useState(() => getStoredBoolean('enso-workspace-collapsed', false));
   const [worktreeCollapsed, setWorktreeCollapsed] = useState(() => getStoredBoolean('enso-worktree-collapsed', false));
 
+  // Settings dialog state
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   // Resize state
   const [resizing, setResizing] = useState<'workspace' | 'worktree' | null>(null);
   const startXRef = useRef(0);
@@ -59,6 +63,18 @@ export default function App() {
 
   // Initialize settings store (for theme hydration)
   useSettingsStore();
+
+  // Global keyboard shortcut: Cmd+, to open settings
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Save panel sizes to localStorage
   useEffect(() => {
@@ -378,6 +394,9 @@ export default function App() {
         onExpandWorkspace={() => setWorkspaceCollapsed(false)}
         onExpandWorktree={() => setWorktreeCollapsed(false)}
       />
+
+      {/* Global Settings Dialog */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }
