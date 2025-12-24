@@ -43,7 +43,21 @@ const getStoredBoolean = (key: string, defaultValue: boolean) => {
   return saved !== null ? saved === 'true' : defaultValue;
 };
 
+const getStoredTabMap = (): Record<string, TabId> => {
+  const saved = localStorage.getItem('enso-worktree-tabs');
+  if (saved) {
+    try {
+      return JSON.parse(saved) as Record<string, TabId>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
 export default function App() {
+  // Per-worktree tab state: { [worktreePath]: TabId }
+  const [worktreeTabMap, setWorktreeTabMap] = useState<Record<string, TabId>>(getStoredTabMap);
   const [activeTab, setActiveTab] = useState<TabId>('chat');
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepo, setSelectedRepo] = useState<string | null>(null);
@@ -93,12 +107,18 @@ export default function App() {
     // Open the file and set cursor position
     navigateToFile(path, line, column);
 
-    // Switch to file tab
+    // Switch to file tab and update worktree tab map
     setActiveTab('file');
+    if (activeWorktree?.path) {
+      setWorktreeTabMap((prev) => ({
+        ...prev,
+        [activeWorktree.path]: 'file',
+      }));
+    }
 
     // Clear the navigation request
     clearNavigation();
-  }, [pendingNavigation, navigateToFile, clearNavigation]);
+  }, [pendingNavigation, navigateToFile, clearNavigation, activeWorktree]);
 
   // Listen for menu actions from main process
   useEffect(() => {
@@ -142,31 +162,42 @@ export default function App() {
       return keyMatch && ctrlMatch && altMatch && shiftMatch && metaMatch;
     };
 
+    const switchTab = (tab: TabId) => {
+      setActiveTab(tab);
+      const worktreePath = activeWorktree?.path;
+      if (worktreePath) {
+        setWorktreeTabMap((prev) => ({
+          ...prev,
+          [worktreePath]: tab,
+        }));
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const bindings = useSettingsStore.getState().mainTabKeybindings;
 
       if (matchesKeybinding(e, bindings.switchToAgent)) {
         e.preventDefault();
-        setActiveTab('chat');
+        switchTab('chat');
         return;
       }
 
       if (matchesKeybinding(e, bindings.switchToFile)) {
         e.preventDefault();
-        setActiveTab('file');
+        switchTab('file');
         return;
       }
 
       if (matchesKeybinding(e, bindings.switchToTerminal)) {
         e.preventDefault();
-        setActiveTab('terminal');
+        switchTab('terminal');
         return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [activeWorktree]);
 
   // Save panel sizes to localStorage
   useEffect(() => {
@@ -184,6 +215,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('enso-worktree-collapsed', String(worktreeCollapsed));
   }, [worktreeCollapsed]);
+
+  // Persist worktree tab map to localStorage
+  useEffect(() => {
+    localStorage.setItem('enso-worktree-tabs', JSON.stringify(worktreeTabMap));
+  }, [worktreeTabMap]);
 
   // Resize handlers
   const handleResizeStart = useCallback(
@@ -338,9 +374,40 @@ export default function App() {
     setActiveWorktree(null);
   };
 
-  const handleSelectWorktree = (worktree: GitWorktree) => {
-    setActiveWorktree(worktree);
-  };
+  // Handle tab change and persist to worktree tab map
+  const handleTabChange = useCallback(
+    (tab: TabId) => {
+      setActiveTab(tab);
+      // Save tab state for current worktree
+      if (activeWorktree?.path) {
+        setWorktreeTabMap((prev) => ({
+          ...prev,
+          [activeWorktree.path]: tab,
+        }));
+      }
+    },
+    [activeWorktree]
+  );
+
+  const handleSelectWorktree = useCallback(
+    (worktree: GitWorktree) => {
+      // Save current worktree's tab state before switching
+      if (activeWorktree?.path) {
+        setWorktreeTabMap((prev) => ({
+          ...prev,
+          [activeWorktree.path]: activeTab,
+        }));
+      }
+
+      // Switch to new worktree
+      setActiveWorktree(worktree);
+
+      // Restore the new worktree's tab state (default to 'chat')
+      const savedTab = worktreeTabMap[worktree.path] || 'chat';
+      setActiveTab(savedTab);
+    },
+    [activeWorktree, activeTab, worktreeTabMap]
+  );
 
   const handleAddRepository = async () => {
     try {
@@ -490,7 +557,7 @@ export default function App() {
       {/* Column 3: Main Content */}
       <MainContent
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
         workspaceName={currentWorkspace?.name}
         repoPath={selectedRepo || undefined}
         worktreePath={activeWorktree?.path}

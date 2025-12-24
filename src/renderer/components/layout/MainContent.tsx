@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { FileCode, FolderOpen, GitBranch, Plus, Sparkles, Terminal } from 'lucide-react';
+import { FileCode, FolderOpen, GitBranch, Sparkles, Terminal } from 'lucide-react';
 import { OpenInMenu } from '@/components/app/OpenInMenu';
 import { AgentPanel } from '@/components/chat/AgentPanel';
 import { FilePanel } from '@/components/files';
@@ -117,12 +117,6 @@ export function MainContent({
               {tab.label}
             </button>
           ))}
-          <button
-            type="button"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Right: Open In Menu */}
