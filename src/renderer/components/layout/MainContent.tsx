@@ -181,6 +181,7 @@ export function MainContent({
         >
           <SourceControlPanel
             rootPath={worktreePath}
+            isActive={activeTab === 'source-control'}
             onExpandWorktree={onExpandWorktree}
             worktreeCollapsed={worktreeCollapsed}
           />

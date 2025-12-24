@@ -34,16 +34,18 @@ const DEFAULT_WIDTH = 256;
 
 interface SourceControlPanelProps {
   rootPath: string | undefined;
+  isActive?: boolean;
   onExpandWorktree?: () => void;
   worktreeCollapsed?: boolean;
 }
 
 export function SourceControlPanel({
   rootPath,
+  isActive = false,
   onExpandWorktree,
   worktreeCollapsed,
 }: SourceControlPanelProps) {
-  const { data: changes, isLoading } = useFileChanges(rootPath ?? null);
+  const { data: changes, isLoading } = useFileChanges(rootPath ?? null, isActive);
   const { selectedFile, setSelectedFile, setNavigationDirection } = useSourceControlStore();
   const stageMutation = useGitStage();
   const unstageMutation = useGitUnstage();

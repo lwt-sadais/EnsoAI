@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-export function useFileChanges(workdir: string | null) {
+export function useFileChanges(workdir: string | null, isActive = true) {
   return useQuery({
     queryKey: ['git', 'file-changes', workdir],
     queryFn: async () => {
@@ -8,7 +8,7 @@ export function useFileChanges(workdir: string | null) {
       return window.electronAPI.git.getFileChanges(workdir);
     },
     enabled: !!workdir,
-    refetchInterval: 5000, // Increased from 3s to 5s for better performance
+    refetchInterval: isActive ? 5000 : false, // Only poll when tab is active
     refetchIntervalInBackground: false, // Only poll when window is focused
     staleTime: 2000, // Avoid redundant requests within 2s
   });
