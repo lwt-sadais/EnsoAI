@@ -47,8 +47,9 @@ export function MainContent({
   onExpandWorkspace,
   onExpandWorktree,
 }: MainContentProps) {
-  // Need extra padding for traffic lights when both panels are collapsed
-  const needsTrafficLightPadding = workspaceCollapsed && worktreeCollapsed;
+  // Need extra padding for traffic lights when both panels are collapsed (macOS only)
+  const isMac = window.electronAPI.env.platform === 'darwin';
+  const needsTrafficLightPadding = isMac && workspaceCollapsed && worktreeCollapsed;
 
   return (
     <main className="flex min-w-[535px] flex-1 flex-col overflow-hidden bg-background">
