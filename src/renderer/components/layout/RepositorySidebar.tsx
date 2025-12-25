@@ -24,7 +24,7 @@ interface Repository {
   path: string;
 }
 
-interface WorkspaceSidebarProps {
+interface RepositorySidebarProps {
   repositories: Repository[];
   selectedRepo: string | null;
   onSelectRepo: (repoPath: string) => void;
@@ -35,7 +35,7 @@ interface WorkspaceSidebarProps {
   onCollapse?: () => void;
 }
 
-export function WorkspaceSidebar({
+export function RepositorySidebar({
   repositories,
   selectedRepo,
   onSelectRepo,
@@ -44,7 +44,7 @@ export function WorkspaceSidebar({
   onOpenSettings,
   collapsed: _collapsed = false,
   onCollapse,
-}: WorkspaceSidebarProps) {
+}: RepositorySidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });

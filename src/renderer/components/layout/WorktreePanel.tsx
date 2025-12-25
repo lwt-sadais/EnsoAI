@@ -49,8 +49,8 @@ interface WorktreePanelProps {
   width?: number;
   collapsed?: boolean;
   onCollapse?: () => void;
-  workspaceCollapsed?: boolean;
-  onExpandWorkspace?: () => void;
+  repositoryCollapsed?: boolean;
+  onExpandRepository?: () => void;
 }
 
 export function WorktreePanel({
@@ -69,8 +69,8 @@ export function WorktreePanel({
   width: _width = 280,
   collapsed: _collapsed = false,
   onCollapse,
-  workspaceCollapsed = false,
-  onExpandWorkspace,
+  repositoryCollapsed = false,
+  onExpandRepository,
 }: WorktreePanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [worktreeToDelete, setWorktreeToDelete] = useState<GitWorktree | null>(null);
@@ -90,16 +90,16 @@ export function WorktreePanel({
       <div
         className={cn(
           'flex h-12 items-center justify-end gap-1 border-b px-3 drag-region',
-          workspaceCollapsed && 'pl-[70px]'
+          repositoryCollapsed && 'pl-[70px]'
         )}
       >
-        {/* Expand workspace button when collapsed */}
-        {workspaceCollapsed && onExpandWorkspace && (
+        {/* Expand repository button when collapsed */}
+        {repositoryCollapsed && onExpandRepository && (
           <button
             type="button"
             className="flex h-8 w-8 items-center justify-center rounded-md no-drag text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
-            onClick={onExpandWorkspace}
-            title="展开 Workspace"
+            onClick={onExpandRepository}
+            title="展开 Repository"
           >
             <FolderOpen className="h-4 w-4" />
           </button>

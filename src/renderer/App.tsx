@@ -1,9 +1,9 @@
-import type { GitWorktree, WorkspaceRecord, WorktreeCreateOptions } from '@shared/types';
+import type { GitWorktree, WorktreeCreateOptions } from '@shared/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActionPanel } from './components/layout/ActionPanel';
 import { MainContent } from './components/layout/MainContent';
-import { WorkspaceSidebar } from './components/layout/WorkspaceSidebar';
+import { RepositorySidebar } from './components/layout/RepositorySidebar';
 import { WorktreePanel } from './components/layout/WorktreePanel';
 import { SettingsDialog } from './components/settings/SettingsDialog';
 import { UpdateNotification } from './components/UpdateNotification';
@@ -22,7 +22,6 @@ import { useWorktreeCreate, useWorktreeList, useWorktreeRemove } from './hooks/u
 import { matchesKeybinding } from './lib/keybinding';
 import { useNavigationStore } from './stores/navigation';
 import { useSettingsStore } from './stores/settings';
-import { useWorkspaceStore } from './stores/workspace';
 import { useWorktreeStore } from './stores/worktree';
 
 // Animation config
@@ -36,9 +35,9 @@ interface Repository {
 }
 
 // Panel size constraints
-const WORKSPACE_MIN = 200;
-const WORKSPACE_MAX = 400;
-const WORKSPACE_DEFAULT = 240;
+const REPOSITORY_MIN = 200;
+const REPOSITORY_MAX = 400;
+const REPOSITORY_DEFAULT = 240;
 const WORKTREE_MIN = 200;
 const WORKTREE_MAX = 400;
 const WORKTREE_DEFAULT = 280;
@@ -91,14 +90,14 @@ export default function App() {
   const [activeWorktree, setActiveWorktree] = useState<GitWorktree | null>(null);
 
   // Panel sizes and collapsed states - initialize from localStorage
-  const [workspaceWidth, setWorkspaceWidth] = useState(() =>
-    getStoredNumber('enso-workspace-width', WORKSPACE_DEFAULT)
+  const [repositoryWidth, setRepositoryWidth] = useState(() =>
+    getStoredNumber('enso-repository-width', REPOSITORY_DEFAULT)
   );
   const [worktreeWidth, setWorktreeWidth] = useState(() =>
     getStoredNumber('enso-worktree-width', WORKTREE_DEFAULT)
   );
-  const [workspaceCollapsed, setWorkspaceCollapsed] = useState(() =>
-    getStoredBoolean('enso-workspace-collapsed', false)
+  const [repositoryCollapsed, setRepositoryCollapsed] = useState(() =>
+    getStoredBoolean('enso-repository-collapsed', false)
   );
   const [worktreeCollapsed, setWorktreeCollapsed] = useState(() =>
     getStoredBoolean('enso-worktree-collapsed', false)
@@ -114,11 +113,10 @@ export default function App() {
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
 
   // Resize state
-  const [resizing, setResizing] = useState<'workspace' | 'worktree' | null>(null);
+  const [resizing, setResizing] = useState<'repository' | 'worktree' | null>(null);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
 
-  const { workspaces, currentWorkspace, setCurrentWorkspace, setWorkspaces } = useWorkspaceStore();
   const worktreeError = useWorktreeStore((s) => s.error);
 
   // Initialize settings store (for theme hydration)
@@ -226,16 +224,16 @@ export default function App() {
 
   // Save panel sizes to localStorage
   useEffect(() => {
-    localStorage.setItem('enso-workspace-width', String(workspaceWidth));
-  }, [workspaceWidth]);
+    localStorage.setItem('enso-repository-width', String(repositoryWidth));
+  }, [repositoryWidth]);
 
   useEffect(() => {
     localStorage.setItem('enso-worktree-width', String(worktreeWidth));
   }, [worktreeWidth]);
 
   useEffect(() => {
-    localStorage.setItem('enso-workspace-collapsed', String(workspaceCollapsed));
-  }, [workspaceCollapsed]);
+    localStorage.setItem('enso-repository-collapsed', String(repositoryCollapsed));
+  }, [repositoryCollapsed]);
 
   useEffect(() => {
     localStorage.setItem('enso-worktree-collapsed', String(worktreeCollapsed));
@@ -248,13 +246,13 @@ export default function App() {
 
   // Resize handlers
   const handleResizeStart = useCallback(
-    (panel: 'workspace' | 'worktree') => (e: React.MouseEvent) => {
+    (panel: 'repository' | 'worktree') => (e: React.MouseEvent) => {
       e.preventDefault();
       setResizing(panel);
       startXRef.current = e.clientX;
-      startWidthRef.current = panel === 'workspace' ? workspaceWidth : worktreeWidth;
+      startWidthRef.current = panel === 'repository' ? repositoryWidth : worktreeWidth;
     },
-    [workspaceWidth, worktreeWidth]
+    [repositoryWidth, worktreeWidth]
   );
 
   useEffect(() => {
@@ -264,8 +262,8 @@ export default function App() {
       const delta = e.clientX - startXRef.current;
       const newWidth = startWidthRef.current + delta;
 
-      if (resizing === 'workspace') {
-        setWorkspaceWidth(Math.max(WORKSPACE_MIN, Math.min(WORKSPACE_MAX, newWidth)));
+      if (resizing === 'repository') {
+        setRepositoryWidth(Math.max(REPOSITORY_MIN, Math.min(REPOSITORY_MAX, newWidth)));
       } else {
         setWorktreeWidth(Math.max(WORKTREE_MIN, Math.min(WORKTREE_MAX, newWidth)));
       }
@@ -298,21 +296,6 @@ export default function App() {
   const createWorktreeMutation = useWorktreeCreate();
   const removeWorktreeMutation = useWorktreeRemove();
   const gitInitMutation = useGitInit();
-
-  // Initialize default workspace if none exists
-  useEffect(() => {
-    if (workspaces.length === 0) {
-      const defaultWorkspace: WorkspaceRecord = {
-        id: 1,
-        name: 'Personal',
-        path: '',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setWorkspaces([defaultWorkspace]);
-      setCurrentWorkspace(defaultWorkspace);
-    }
-  }, [workspaces.length, setWorkspaces, setCurrentWorkspace]);
 
   // Load saved repositories and selection from localStorage
   useEffect(() => {
@@ -408,12 +391,6 @@ export default function App() {
       }
     }
   }, [worktrees, activeWorktree]);
-
-  const handleSelectWorkspace = (workspace: WorkspaceRecord) => {
-    setCurrentWorkspace(workspace);
-    setSelectedRepo(null);
-    setActiveWorktree(null);
-  };
 
   const handleSelectRepo = (repoPath: string) => {
     setSelectedRepo(repoPath);
@@ -542,18 +519,18 @@ export default function App() {
 
   return (
     <div className={`flex h-screen overflow-hidden ${resizing ? 'select-none' : ''}`}>
-      {/* Column 1: Workspace Sidebar */}
+      {/* Column 1: Repository Sidebar */}
       <AnimatePresence initial={false}>
-        {!workspaceCollapsed && (
+        {!repositoryCollapsed && (
           <motion.div
-            key="workspace"
+            key="repository"
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: workspaceWidth, opacity: 1 }}
+            animate={{ width: repositoryWidth, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={panelTransition}
             className="relative h-full shrink-0 overflow-hidden"
           >
-            <WorkspaceSidebar
+            <RepositorySidebar
               repositories={repositories}
               selectedRepo={selectedRepo}
               onSelectRepo={handleSelectRepo}
@@ -561,12 +538,12 @@ export default function App() {
               onRemoveRepository={handleRemoveRepository}
               onOpenSettings={() => setSettingsOpen(true)}
               collapsed={false}
-              onCollapse={() => setWorkspaceCollapsed(true)}
+              onCollapse={() => setRepositoryCollapsed(true)}
             />
             {/* Resize handle */}
             <div
               className="absolute right-0 top-0 h-full w-1 cursor-col-resize bg-transparent hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
-              onMouseDown={handleResizeStart('workspace')}
+              onMouseDown={handleResizeStart('repository')}
             />
           </motion.div>
         )}
@@ -602,8 +579,8 @@ export default function App() {
               width={worktreeWidth}
               collapsed={false}
               onCollapse={() => setWorktreeCollapsed(true)}
-              workspaceCollapsed={workspaceCollapsed}
-              onExpandWorkspace={() => setWorkspaceCollapsed(false)}
+              repositoryCollapsed={repositoryCollapsed}
+              onExpandRepository={() => setRepositoryCollapsed(false)}
             />
             {/* Resize handle */}
             <div
@@ -618,12 +595,11 @@ export default function App() {
       <MainContent
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        workspaceName={currentWorkspace?.name}
         repoPath={selectedRepo || undefined}
         worktreePath={activeWorktree?.path}
-        workspaceCollapsed={workspaceCollapsed}
+        repositoryCollapsed={repositoryCollapsed}
         worktreeCollapsed={worktreeCollapsed}
-        onExpandWorkspace={() => setWorkspaceCollapsed(false)}
+        onExpandRepository={() => setRepositoryCollapsed(false)}
         onExpandWorktree={() => setWorktreeCollapsed(false)}
         onSwitchWorktree={handleSwitchWorktreePath}
       />
@@ -635,19 +611,16 @@ export default function App() {
       <ActionPanel
         open={actionPanelOpen}
         onOpenChange={setActionPanelOpen}
-        workspaceCollapsed={workspaceCollapsed}
+        repositoryCollapsed={repositoryCollapsed}
         worktreeCollapsed={worktreeCollapsed}
         projectPath={activeWorktree?.path || selectedRepo || undefined}
-        workspaces={workspaces}
-        currentWorkspaceId={currentWorkspace?.id}
         repositories={repositories}
         selectedRepoPath={selectedRepo ?? undefined}
         worktrees={worktrees}
         activeWorktreePath={activeWorktree?.path}
-        onToggleWorkspace={() => setWorkspaceCollapsed((prev) => !prev)}
+        onToggleRepository={() => setRepositoryCollapsed((prev) => !prev)}
         onToggleWorktree={() => setWorktreeCollapsed((prev) => !prev)}
         onOpenSettings={() => setSettingsOpen(true)}
-        onSwitchWorkspace={handleSelectWorkspace}
         onSwitchRepo={handleSelectRepo}
         onSwitchWorktree={handleSelectWorktree}
       />

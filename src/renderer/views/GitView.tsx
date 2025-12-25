@@ -19,7 +19,6 @@ import {
   useGitPush,
   useGitStatus,
 } from '@/hooks/useGit';
-import { useWorkspaceStore } from '@/stores/workspace';
 import { useWorktreeStore } from '@/stores/worktree';
 
 interface GitViewProps {
@@ -27,11 +26,9 @@ interface GitViewProps {
 }
 
 export function GitView({ isActive = false }: GitViewProps) {
-  const { currentWorkspace } = useWorkspaceStore();
   const { currentWorktree } = useWorktreeStore();
 
-  // Use worktree path if available, otherwise workspace path
-  const workdir = currentWorktree?.path || currentWorkspace?.path || null;
+  const workdir = currentWorktree?.path || null;
 
   const {
     data: status,
@@ -109,10 +106,10 @@ export function GitView({ isActive = false }: GitViewProps) {
     // TODO: Open file in editor/diff view
   };
 
-  if (!currentWorkspace) {
+  if (!currentWorktree) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
-        <p>请先选择一个工作区</p>
+        <p>请先选择一个 Worktree</p>
       </div>
     );
   }

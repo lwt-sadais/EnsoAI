@@ -1,9 +1,8 @@
-import type { GitWorktree, WorkspaceRecord } from '@shared/types';
+import type { GitWorktree } from '@shared/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Clock,
   ExternalLink,
-  Folder,
   FolderOpen,
   GitBranch,
   Loader2,
@@ -131,19 +130,16 @@ interface Repository {
 interface ActionPanelProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  workspaceCollapsed: boolean;
+  repositoryCollapsed: boolean;
   worktreeCollapsed: boolean;
   projectPath?: string;
-  workspaces?: WorkspaceRecord[];
-  currentWorkspaceId?: number;
   repositories?: Repository[];
   selectedRepoPath?: string;
   worktrees?: GitWorktree[];
   activeWorktreePath?: string;
-  onToggleWorkspace: () => void;
+  onToggleRepository: () => void;
   onToggleWorktree: () => void;
   onOpenSettings: () => void;
-  onSwitchWorkspace?: (workspace: WorkspaceRecord) => void;
   onSwitchRepo?: (repoPath: string) => void;
   onSwitchWorktree?: (worktree: GitWorktree) => void;
 }
@@ -166,19 +162,16 @@ interface ActionGroup {
 export function ActionPanel({
   open,
   onOpenChange,
-  workspaceCollapsed,
+  repositoryCollapsed,
   worktreeCollapsed,
   projectPath,
-  workspaces = [],
-  currentWorkspaceId,
   repositories = [],
   selectedRepoPath,
   worktrees = [],
   activeWorktreePath,
-  onToggleWorkspace,
+  onToggleRepository,
   onToggleWorktree,
   onOpenSettings,
-  onSwitchWorkspace,
   onSwitchRepo,
   onSwitchWorktree,
 }: ActionPanelProps) {
@@ -203,10 +196,10 @@ export function ActionPanel({
         label: '面板',
         items: [
           {
-            id: 'toggle-workspace',
-            label: workspaceCollapsed ? '展开 Workspace' : '折叠 Workspace',
-            icon: workspaceCollapsed ? FolderOpen : PanelLeftClose,
-            action: onToggleWorkspace,
+            id: 'toggle-repository',
+            label: repositoryCollapsed ? '展开 Repository' : '折叠 Repository',
+            icon: repositoryCollapsed ? FolderOpen : PanelLeftClose,
+            action: onToggleRepository,
           },
           {
             id: 'toggle-worktree',
@@ -254,24 +247,6 @@ export function ActionPanel({
         ],
       },
     ];
-
-    // Add "Switch Workspace" group
-    if (workspaces.length > 1 && onSwitchWorkspace) {
-      const switchableWorkspaces = workspaces.filter((ws) => ws.id !== currentWorkspaceId);
-      if (switchableWorkspaces.length > 0) {
-        groups.push({
-          label: '切换 Workspace',
-          items: switchableWorkspaces.map((ws) => ({
-            id: `switch-workspace-${ws.id}`,
-            label: `切换到 ${ws.name}`,
-            icon: Folder,
-            action: () => {
-              onSwitchWorkspace(ws);
-            },
-          })),
-        });
-      }
-    }
 
     // Add "Switch Repository" group
     if (repositories.length > 1 && onSwitchRepo) {
@@ -346,11 +321,9 @@ export function ActionPanel({
 
     return groups;
   }, [
-    workspaceCollapsed,
+    repositoryCollapsed,
     worktreeCollapsed,
     projectPath,
-    workspaces,
-    currentWorkspaceId,
     repositories,
     selectedRepoPath,
     worktrees,
@@ -358,10 +331,9 @@ export function ActionPanel({
     detectedApps,
     cliStatus,
     recentIds,
-    onToggleWorkspace,
+    onToggleRepository,
     onToggleWorktree,
     onOpenSettings,
-    onSwitchWorkspace,
     onSwitchRepo,
     onSwitchWorktree,
     openWith,
