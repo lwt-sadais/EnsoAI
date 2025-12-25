@@ -58,9 +58,9 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
   const currentTabs = useMemo(() => tabs.filter((t) => t.cwd === cwd), [tabs, cwd]);
   const activeId = cwd ? activeIds[cwd] || null : null;
 
-  // Create initial tab when a new cwd becomes available
+  // Create initial tab only when terminal panel becomes active for this worktree (lazy loading)
   useEffect(() => {
-    if (cwd && !initializedCwdsRef.current.has(cwd)) {
+    if (cwd && isActive && !initializedCwdsRef.current.has(cwd)) {
       initializedCwdsRef.current.add(cwd);
       const defaultTab: TerminalTab = { id: crypto.randomUUID(), name: 'Untitled-1', cwd };
       setState((prev) => ({
@@ -68,7 +68,7 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
         activeIds: { ...prev.activeIds, [cwd]: defaultTab.id },
       }));
     }
-  }, [cwd]);
+  }, [cwd, isActive]);
 
   // Stable terminal IDs - only append, never reorder (prevents DOM reordering issues with xterm)
   const [terminalIds, setTerminalIds] = useState<string[]>(() => tabs.map((t) => t.id));
