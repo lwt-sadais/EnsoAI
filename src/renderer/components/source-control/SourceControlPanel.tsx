@@ -391,7 +391,7 @@ export function SourceControlPanel({
                   >
                     <ChevronDown
                       className={cn(
-                        'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                        'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
                         !changesExpanded && '-rotate-90'
                       )}
                     />
@@ -437,11 +437,11 @@ export function SourceControlPanel({
                 <button
                   type="button"
                   onClick={() => setHistoryExpanded(!historyExpanded)}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left rounded-sm hover:bg-accent/50 transition-colors shrink-0 focus:outline-none"
+                  className="group flex w-full items-center gap-2 px-4 py-2 text-left rounded-sm hover:bg-accent/50 transition-colors shrink-0 focus:outline-none"
                 >
                   <ChevronDown
                     className={cn(
-                      'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                      'h-4 w-4 text-muted-foreground/60 group-hover:text-foreground transition-all duration-200',
                       !historyExpanded && '-rotate-90'
                     )}
                   />
