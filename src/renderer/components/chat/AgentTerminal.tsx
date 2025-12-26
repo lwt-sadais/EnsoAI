@@ -21,6 +21,7 @@ interface AgentTerminalProps {
 }
 
 const MIN_RUNTIME_FOR_AUTO_CLOSE = 10000; // 10 seconds
+const MIN_OUTPUT_FOR_NOTIFICATION = 100; // Minimum chars to consider agent is doing work
 
 export function AgentTerminal({
   cwd,
@@ -41,7 +42,9 @@ export function AgentTerminal({
   const hasInitializedRef = useRef(false);
   const hasActivatedRef = useRef(false);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isWaitingForIdleRef = useRef(false); // Wait for idle notification; enabled after Enter.
+  const isWaitingForIdleRef = useRef(false); // Wait for idle notification; enabled after substantial output.
+  const pendingIdleMonitorRef = useRef(false); // Pending idle monitor; enabled after Enter.
+  const dataSinceEnterRef = useRef(0); // Track output volume since last Enter.
   const currentTitleRef = useRef<string>(''); // Terminal title from OSC escape sequence.
 
   // Build command with session args
@@ -119,6 +122,19 @@ export function AgentTerminal({
         outputBufferRef.current = outputBufferRef.current.slice(-500);
       }
 
+      // Track output volume since last Enter
+      dataSinceEnterRef.current += data.length;
+
+      // Only arm idle monitoring after receiving substantial output
+      // This prevents notifications from simple prompt echoes
+      if (
+        pendingIdleMonitorRef.current &&
+        dataSinceEnterRef.current > MIN_OUTPUT_FOR_NOTIFICATION
+      ) {
+        isWaitingForIdleRef.current = true;
+        pendingIdleMonitorRef.current = false;
+      }
+
       // Skip if notification disabled or not waiting for idle
       if (!agentNotificationEnabled || !isWaitingForIdleRef.current) return;
 
@@ -181,8 +197,10 @@ export function AgentTerminal({
           hasActivatedRef.current = true;
           onActivated?.();
         }
-        // Each Enter enables idle monitoring for the next notification.
-        isWaitingForIdleRef.current = true;
+        // Reset output counter and enable pending idle monitor.
+        // Actual idle monitoring is armed after receiving substantial output.
+        dataSinceEnterRef.current = 0;
+        pendingIdleMonitorRef.current = true;
         return true; // Let Enter through normally
       }
 
@@ -193,8 +211,13 @@ export function AgentTerminal({
       }
 
       // User is typing - cancel idle notification
-      if (isWaitingForIdleRef.current && !event.metaKey && !event.ctrlKey) {
+      if (
+        (isWaitingForIdleRef.current || pendingIdleMonitorRef.current) &&
+        !event.metaKey &&
+        !event.ctrlKey
+      ) {
         isWaitingForIdleRef.current = false;
+        pendingIdleMonitorRef.current = false;
         if (idleTimerRef.current) {
           clearTimeout(idleTimerRef.current);
           idleTimerRef.current = null;
