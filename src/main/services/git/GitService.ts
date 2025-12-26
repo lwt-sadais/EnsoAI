@@ -107,49 +107,52 @@ export class GitService {
       renamedMap.set(rename.to, rename.from);
     }
 
-    // Helper to determine status for staged files
-    const getStagedStatus = (file: string): FileChangeStatus => {
-      if (status.created.includes(file)) return 'A';
-      if (renamedMap.has(file)) return 'R';
-      if (status.conflicted.includes(file)) return 'X';
-      // For staged files, check if the file exists in the files array with deleted status
-      // simple-git marks staged deletions in the 'staged' array
-      return 'M';
-    };
+    // Use status.files for precise file status detection
+    // Each file has 'index' (staging area vs HEAD) and 'working_dir' (working tree vs index)
+    for (const file of status.files) {
+      const filePath = file.path;
+      const indexStatus = file.index;
+      const workingDirStatus = file.working_dir;
 
-    // Staged files
-    for (const file of status.staged) {
-      const change: FileChange = {
-        path: file,
-        status: getStagedStatus(file),
-        staged: true,
-      };
-      // Add originalPath for renamed files
-      if (renamedMap.has(file)) {
-        change.originalPath = renamedMap.get(file);
+      // Check index status (staged changes) - compare staging area to HEAD
+      // Valid index statuses: M (modified), A (added), D (deleted), R (renamed), C (copied), U (conflict)
+      if (indexStatus && indexStatus !== ' ' && indexStatus !== '?') {
+        let fileStatus: FileChangeStatus;
+        if (indexStatus === 'A') fileStatus = 'A';
+        else if (indexStatus === 'D') fileStatus = 'D';
+        else if (indexStatus === 'R') fileStatus = 'R';
+        else if (indexStatus === 'C') fileStatus = 'C';
+        else if (indexStatus === 'U')
+          fileStatus = 'X'; // Conflict
+        else fileStatus = 'M';
+
+        const change: FileChange = {
+          path: filePath,
+          status: fileStatus,
+          staged: true,
+        };
+        if (renamedMap.has(filePath)) {
+          change.originalPath = renamedMap.get(filePath);
+        }
+        changes.push(change);
       }
-      changes.push(change);
-    }
 
-    // Unstaged modified files (include even if staged - partial staging case)
-    for (const file of status.modified) {
-      changes.push({ path: file, status: 'M', staged: false });
-    }
+      // Check working_dir status (unstaged changes) - compare working tree to index
+      // Valid working_dir statuses: M (modified), D (deleted), ? (untracked), U (conflict)
+      if (workingDirStatus && workingDirStatus !== ' ') {
+        let fileStatus: FileChangeStatus;
+        if (workingDirStatus === '?')
+          fileStatus = 'U'; // Untracked
+        else if (workingDirStatus === 'D') fileStatus = 'D';
+        else if (workingDirStatus === 'U')
+          fileStatus = 'X'; // Conflict
+        else fileStatus = 'M';
 
-    // Unstaged deleted files (include even if staged - partial staging case)
-    for (const file of status.deleted) {
-      changes.push({ path: file, status: 'D', staged: false });
-    }
-
-    // Untracked files
-    for (const file of status.not_added) {
-      changes.push({ path: file, status: 'U', staged: false });
-    }
-
-    // Conflicted files (add if not already present)
-    for (const file of status.conflicted) {
-      if (!changes.some((c) => c.path === file)) {
-        changes.push({ path: file, status: 'X', staged: false });
+        changes.push({
+          path: filePath,
+          status: fileStatus,
+          staged: false,
+        });
       }
     }
 

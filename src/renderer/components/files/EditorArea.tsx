@@ -1,21 +1,8 @@
-import Editor, { loader, type OnMount } from '@monaco-editor/react';
-import { shikiToMonaco } from '@shikijs/monaco';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { FileCode, Sparkles } from 'lucide-react';
-import * as monaco from 'monaco-editor';
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
-import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
-import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
-import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
-import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import type * as monaco from 'monaco-editor';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { createHighlighterCore } from 'shiki/core';
-import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
-import langAstro from 'shiki/langs/astro.mjs';
-import langSvelte from 'shiki/langs/svelte.mjs';
-import langVue from 'shiki/langs/vue.mjs';
-import themeVitesseDark from 'shiki/themes/vitesse-dark.mjs';
-import themeVitesseLight from 'shiki/themes/vitesse-light.mjs';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -34,163 +21,16 @@ import {
 import { toastManager } from '@/components/ui/toast';
 import { useDebouncedSave } from '@/hooks/useDebouncedSave';
 import { useI18n } from '@/i18n';
-import { getXtermTheme, isTerminalThemeDark } from '@/lib/ghosttyTheme';
 import type { EditorTab, PendingCursor } from '@/stores/editor';
 import { useEditorStore } from '@/stores/editor';
 import { useSettingsStore } from '@/stores/settings';
 import { EditorTabs } from './EditorTabs';
-
-// Configure Monaco workers for Electron environment
-self.MonacoEnvironment = {
-  getWorker(_, label) {
-    if (label === 'json') return new jsonWorker();
-    if (label === 'css' || label === 'scss' || label === 'less') return new cssWorker();
-    if (label === 'html' || label === 'handlebars' || label === 'razor') return new htmlWorker();
-    if (label === 'typescript' || label === 'javascript') return new tsWorker();
-    return new editorWorker();
-  },
-};
-
-// Tell @monaco-editor/react to use our pre-configured monaco instance
-loader.config({ monaco });
-
-// Languages to highlight with Shiki (not natively supported by Monaco)
-const SHIKI_LANGUAGES = ['vue', 'svelte', 'astro'];
-const SHIKI_THEMES = ['vitesse-dark', 'vitesse-light'];
-
-// Register Shiki languages with Monaco for syntax highlighting
-// Uses fine-grained imports for smaller bundle size (no WASM needed)
-const shikiHighlighter = await createHighlighterCore({
-  themes: [themeVitesseDark, themeVitesseLight],
-  langs: [langVue, langSvelte, langAstro],
-  engine: createJavaScriptRegexEngine(),
-});
-
-// Register language IDs with Monaco (include extensions for auto-detection)
-for (const lang of SHIKI_LANGUAGES) {
-  monaco.languages.register({ id: lang, extensions: [`.${lang}`] });
-}
-
-// Save original setTheme before shikiToMonaco patches it
-const originalSetTheme = monaco.editor.setTheme.bind(monaco.editor);
-
-// Apply Shiki highlighting to Monaco (this patches setTheme)
-shikiToMonaco(shikiHighlighter, monaco);
-
-// Get Shiki's patched setTheme
-const shikiSetTheme = monaco.editor.setTheme.bind(monaco.editor);
-const shikiThemeSet = new Set<string>(SHIKI_THEMES);
-
-// Restore setTheme with fallback for non-Shiki themes
-monaco.editor.setTheme = (themeName: string) => {
-  if (shikiThemeSet.has(themeName)) {
-    shikiSetTheme(themeName);
-  } else {
-    originalSetTheme(themeName);
-  }
-};
-
-// Configure TypeScript compiler options to suppress module resolution errors
-// Monaco's TS service can't resolve project-specific paths like @/* aliases
-monaco.typescript.typescriptDefaults.setCompilerOptions({
-  target: monaco.typescript.ScriptTarget.ESNext,
-  module: monaco.typescript.ModuleKind.ESNext,
-  moduleResolution: monaco.typescript.ModuleResolutionKind.NodeJs,
-  allowNonTsExtensions: true,
-  allowSyntheticDefaultImports: true,
-  esModuleInterop: true,
-  jsx: monaco.typescript.JsxEmit.ReactJSX,
-  strict: true,
-  skipLibCheck: true,
-  noEmit: true,
-  // Suppress module not found errors since we can't provide full project context
-  noResolve: true,
-});
-
-monaco.typescript.javascriptDefaults.setCompilerOptions({
-  target: monaco.typescript.ScriptTarget.ESNext,
-  module: monaco.typescript.ModuleKind.ESNext,
-  moduleResolution: monaco.typescript.ModuleResolutionKind.NodeJs,
-  allowNonTsExtensions: true,
-  allowSyntheticDefaultImports: true,
-  esModuleInterop: true,
-  jsx: monaco.typescript.JsxEmit.ReactJSX,
-  noResolve: true,
-});
-
-// Disable semantic validation to avoid module resolution errors
-monaco.typescript.typescriptDefaults.setDiagnosticsOptions({
-  noSemanticValidation: true,
-  noSyntaxValidation: false,
-});
-
-monaco.typescript.javascriptDefaults.setDiagnosticsOptions({
-  noSemanticValidation: true,
-  noSyntaxValidation: false,
-});
+import { buildMonacoKeybinding } from './keyBindings';
+import { CUSTOM_THEME_NAME, defineMonacoTheme } from './monacoTheme';
+// Import for side effects (Monaco setup)
+import './monacoSetup';
 
 type Monaco = typeof monaco;
-
-const CUSTOM_THEME_NAME = 'enso-theme';
-
-// Define Monaco theme from terminal theme
-function defineMonacoTheme(terminalThemeName: string) {
-  const xtermTheme = getXtermTheme(terminalThemeName);
-  if (!xtermTheme) return;
-
-  const isDark = isTerminalThemeDark(terminalThemeName);
-
-  monaco.editor.defineTheme(CUSTOM_THEME_NAME, {
-    base: isDark ? 'vs-dark' : 'vs',
-    inherit: true,
-    rules: [
-      // Basic tokens (Monaco native)
-      { token: 'comment', foreground: xtermTheme.brightBlack.replace('#', '') },
-      { token: 'keyword', foreground: xtermTheme.magenta.replace('#', '') },
-      { token: 'string', foreground: xtermTheme.green.replace('#', '') },
-      { token: 'number', foreground: xtermTheme.yellow.replace('#', '') },
-      { token: 'type', foreground: xtermTheme.cyan.replace('#', '') },
-      { token: 'function', foreground: xtermTheme.blue.replace('#', '') },
-      { token: 'variable', foreground: xtermTheme.red.replace('#', '') },
-      { token: 'constant', foreground: xtermTheme.brightYellow.replace('#', '') },
-      // TextMate tokens (Shiki)
-      { token: 'keyword.control', foreground: xtermTheme.magenta.replace('#', '') },
-      { token: 'keyword.operator', foreground: xtermTheme.magenta.replace('#', '') },
-      { token: 'storage.type', foreground: xtermTheme.magenta.replace('#', '') },
-      { token: 'storage.modifier', foreground: xtermTheme.magenta.replace('#', '') },
-      { token: 'entity.name.function', foreground: xtermTheme.blue.replace('#', '') },
-      { token: 'entity.name.type', foreground: xtermTheme.cyan.replace('#', '') },
-      { token: 'entity.name.tag', foreground: xtermTheme.red.replace('#', '') },
-      { token: 'entity.other.attribute-name', foreground: xtermTheme.yellow.replace('#', '') },
-      { token: 'variable.other', foreground: xtermTheme.foreground.replace('#', '') },
-      { token: 'variable.parameter', foreground: xtermTheme.red.replace('#', '') },
-      { token: 'support.function', foreground: xtermTheme.blue.replace('#', '') },
-      { token: 'support.type', foreground: xtermTheme.cyan.replace('#', '') },
-      { token: 'constant.language', foreground: xtermTheme.brightYellow.replace('#', '') },
-      { token: 'constant.numeric', foreground: xtermTheme.yellow.replace('#', '') },
-      { token: 'punctuation', foreground: xtermTheme.foreground.replace('#', '') },
-      { token: 'punctuation.definition.tag', foreground: xtermTheme.brightBlack.replace('#', '') },
-      { token: 'meta.brace', foreground: xtermTheme.foreground.replace('#', '') },
-    ],
-    colors: {
-      'editor.background': xtermTheme.background,
-      'editor.foreground': xtermTheme.foreground,
-      'editor.selectionBackground': xtermTheme.selectionBackground,
-      'editor.lineHighlightBackground': isDark
-        ? `${xtermTheme.brightBlack}30`
-        : `${xtermTheme.black}10`,
-      'editorCursor.foreground': xtermTheme.cursor,
-      'editorLineNumber.foreground': xtermTheme.brightBlack,
-      'editorLineNumber.activeForeground': xtermTheme.foreground,
-      'editorIndentGuide.background': isDark
-        ? `${xtermTheme.brightBlack}40`
-        : `${xtermTheme.black}20`,
-      'editorIndentGuide.activeBackground': isDark
-        ? `${xtermTheme.brightBlack}80`
-        : `${xtermTheme.black}40`,
-    },
-  });
-}
 
 interface EditorAreaProps {
   tabs: EditorTab[];
@@ -379,54 +219,6 @@ export function EditorArea({
     onClearPendingCursor();
   }, [pendingCursor, activeTabPath, onClearPendingCursor]);
 
-  // Build keybinding for Monaco from settings
-  const buildAtMentionedKeybinding = useCallback(
-    (m: typeof monaco) => {
-      const kb = claudeCodeIntegration.atMentionedKeybinding;
-      let keyCode = 0;
-
-      // Convert key to Monaco KeyCode
-      const keyMap: Record<string, number> = {
-        a: m.KeyCode.KeyA,
-        b: m.KeyCode.KeyB,
-        c: m.KeyCode.KeyC,
-        d: m.KeyCode.KeyD,
-        e: m.KeyCode.KeyE,
-        f: m.KeyCode.KeyF,
-        g: m.KeyCode.KeyG,
-        h: m.KeyCode.KeyH,
-        i: m.KeyCode.KeyI,
-        j: m.KeyCode.KeyJ,
-        k: m.KeyCode.KeyK,
-        l: m.KeyCode.KeyL,
-        m: m.KeyCode.KeyM,
-        n: m.KeyCode.KeyN,
-        o: m.KeyCode.KeyO,
-        p: m.KeyCode.KeyP,
-        q: m.KeyCode.KeyQ,
-        r: m.KeyCode.KeyR,
-        s: m.KeyCode.KeyS,
-        t: m.KeyCode.KeyT,
-        u: m.KeyCode.KeyU,
-        v: m.KeyCode.KeyV,
-        w: m.KeyCode.KeyW,
-        x: m.KeyCode.KeyX,
-        y: m.KeyCode.KeyY,
-        z: m.KeyCode.KeyZ,
-      };
-      keyCode = keyMap[kb.key.toLowerCase()] || m.KeyCode.KeyM;
-
-      // Apply modifiers
-      if (kb.ctrl) keyCode |= m.KeyMod.CtrlCmd;
-      if (kb.meta) keyCode |= m.KeyMod.CtrlCmd;
-      if (kb.shift) keyCode |= m.KeyMod.Shift;
-      if (kb.alt) keyCode |= m.KeyMod.Alt;
-
-      return keyCode;
-    },
-    [claudeCodeIntegration.atMentionedKeybinding]
-  );
-
   const handleEditorMount: OnMount = useCallback(
     (editor, m) => {
       editorRef.current = editor;
@@ -441,7 +233,8 @@ export function EditorArea({
 
       // Add configurable shortcut to mention selection in Claude
       if (claudeCodeIntegration.enabled) {
-        editor.addCommand(buildAtMentionedKeybinding(m), () => {
+        const keybinding = buildMonacoKeybinding(m, claudeCodeIntegration.atMentionedKeybinding);
+        editor.addCommand(keybinding, () => {
           if (!activeTabPath) return;
           const selection = editor.getSelection();
           if (!selection) return;
@@ -596,7 +389,7 @@ export function EditorArea({
       onSave,
       claudeCodeIntegration.enabled,
       claudeCodeIntegration.selectionChangedDebounce,
-      buildAtMentionedKeybinding,
+      claudeCodeIntegration.atMentionedKeybinding,
       t,
       setCurrentCursorLine,
     ]

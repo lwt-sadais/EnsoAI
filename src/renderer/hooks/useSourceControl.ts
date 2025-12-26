@@ -37,9 +37,12 @@ export function useGitStage() {
     mutationFn: async ({ workdir, paths }: { workdir: string; paths: string[] }) => {
       await window.electronAPI.git.stage(workdir, paths);
     },
-    onSuccess: (_, { workdir }) => {
-      queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] });
+    onSuccess: async (_, { workdir }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-diff', workdir] }),
+      ]);
     },
   });
 }
@@ -51,9 +54,12 @@ export function useGitUnstage() {
     mutationFn: async ({ workdir, paths }: { workdir: string; paths: string[] }) => {
       await window.electronAPI.git.unstage(workdir, paths);
     },
-    onSuccess: (_, { workdir }) => {
-      queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] });
+    onSuccess: async (_, { workdir }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-diff', workdir] }),
+      ]);
     },
   });
 }
@@ -65,10 +71,12 @@ export function useGitDiscard() {
     mutationFn: async ({ workdir, path }: { workdir: string; path: string }) => {
       await window.electronAPI.git.discard(workdir, path);
     },
-    onSuccess: (_, { workdir }) => {
-      queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'file-diff', workdir] });
+    onSuccess: async (_, { workdir }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-diff', workdir] }),
+      ]);
     },
   });
 }
@@ -80,10 +88,13 @@ export function useGitCommit() {
     mutationFn: async ({ workdir, message }: { workdir: string; message: string }) => {
       return window.electronAPI.git.commit(workdir, message);
     },
-    onSuccess: (_, { workdir }) => {
-      queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] });
-      queryClient.invalidateQueries({ queryKey: ['git', 'log', workdir] });
+    onSuccess: async (_, { workdir }) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-changes', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'status', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'log', workdir] }),
+        queryClient.invalidateQueries({ queryKey: ['git', 'file-diff', workdir] }),
+      ]);
     },
   });
 }
