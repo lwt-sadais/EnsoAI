@@ -95,6 +95,10 @@ linux:
   category: Development
   icon: build/icons
 
+appImage:
+  # Enable differential download for AppImage (generates .blockmap file)
+  differentialPackage: true
+
 publish:
   provider: github
   owner: J3n5en
