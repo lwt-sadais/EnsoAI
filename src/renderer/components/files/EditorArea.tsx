@@ -254,7 +254,7 @@ export function EditorArea({
 
           toastManager.add({
             type: 'success',
-            timeout: 500,
+            timeout: 1200,
             title: t('Sent to Claude Code'),
             description: `${fileName}:${selection.startLineNumber}-${selection.endLineNumber} (${lineCount} ${t('lines')})`,
           });

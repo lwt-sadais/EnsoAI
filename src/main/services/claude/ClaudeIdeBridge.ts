@@ -121,19 +121,16 @@ function createJsonRpcHandler({ ideName }: { ideName: string }) {
 
   function reply(ws: WebSocket, id: number | string, result: unknown): void {
     const response = { jsonrpc: '2.0', id, result };
-    console.log('[ClaudeIdeBridge] >>> OUT:', JSON.stringify(response));
     ws.send(JSON.stringify(response));
   }
 
   function error(ws: WebSocket, id: number | string, code: number, message: string): void {
     const response = { jsonrpc: '2.0', id, error: { code, message } };
-    console.log('[ClaudeIdeBridge] >>> OUT:', JSON.stringify(response));
     ws.send(JSON.stringify(response));
   }
 
   return async function onMessage(ws: WebSocket, raw: RawData): Promise<void> {
     const rawStr = raw.toString('utf-8');
-    console.log('[ClaudeIdeBridge] <<< IN:', rawStr);
     const msg = safeJsonParse(rawStr);
     if (!msg || msg.jsonrpc !== '2.0') return;
 
@@ -141,10 +138,6 @@ function createJsonRpcHandler({ ideName }: { ideName: string }) {
     if (!('id' in msg) || msg.id === undefined) {
       if (msg.method === 'notifications/initialized') {
         initialized = true;
-      }
-      // ide_connected is just a notification, no response needed
-      if (msg.method === 'ide_connected') {
-        console.log('[ClaudeIdeBridge] Claude Code connected, pid:', msg.params?.pid);
       }
       return;
     }
@@ -212,14 +205,7 @@ export async function startClaudeIdeBridge(
   // Function to send notifications to Claude Code
   function sendNotification(method: string, params: object): void {
     if (currentClient && currentClient.readyState === 1) {
-      // OPEN = 1
-      const message = JSON.stringify({
-        jsonrpc: '2.0',
-        method,
-        params,
-      });
-      console.log('[ClaudeIdeBridge] >>> NOTIFY:', message);
-      currentClient.send(message);
+      currentClient.send(JSON.stringify({ jsonrpc: '2.0', method, params }));
     }
   }
 
@@ -275,8 +261,6 @@ export async function startClaudeIdeBridge(
     ideName,
   });
 
-  console.log(`[ClaudeIdeBridge] Started on port ${port}, lock file: ${lockPath}`);
-
   return {
     port,
     authToken,
@@ -294,7 +278,6 @@ export async function startClaudeIdeBridge(
     updateWorkspaceFolders(folders: string[]): void {
       currentWorkspaceFolders = [...folders];
       writeLockFile({ port, authToken, workspaceFolders: currentWorkspaceFolders, ideName });
-      console.log(`[ClaudeIdeBridge] Updated workspaceFolders:`, currentWorkspaceFolders);
     },
     // Send selection_changed notification to Claude Code
     sendSelectionChanged(params: {
@@ -325,7 +308,6 @@ export async function startClaudeIdeBridge(
       } catch {
         // Ignore
       }
-      console.log('[ClaudeIdeBridge] Disposed');
     },
   };
 }
@@ -373,9 +355,7 @@ export async function setClaudeBridgeEnabled(
         ...bridgeOptions,
         workspaceFolders: workspaceFolders ?? [],
       });
-      console.log('[ClaudeIdeBridge] Enabled');
     } else if (workspaceFolders) {
-      // Bridge already running, just update workspaceFolders
       bridgeInstance.updateWorkspaceFolders(workspaceFolders);
     }
     return true;
@@ -383,7 +363,6 @@ export async function setClaudeBridgeEnabled(
     if (bridgeInstance) {
       bridgeInstance.dispose();
       bridgeInstance = null;
-      console.log('[ClaudeIdeBridge] Disabled');
     }
     return false;
   }
