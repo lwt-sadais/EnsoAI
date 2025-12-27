@@ -1,7 +1,7 @@
-import { DiffEditor, loader } from '@monaco-editor/react';
+import { DiffEditor } from '@monaco-editor/react';
 import { ChevronDown, ChevronUp, ExternalLink, FileCode } from 'lucide-react';
-import * as monaco from 'monaco-editor';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { monaco } from '@/components/files/monacoSetup';
 import {
   Empty,
   EmptyDescription,
@@ -18,9 +18,7 @@ import { useNavigationStore } from '@/stores/navigation';
 import { useSettingsStore } from '@/stores/settings';
 import { useSourceControlStore } from '@/stores/sourceControl';
 
-loader.config({ monaco });
-
-type DiffEditorInstance = monaco.editor.IStandaloneDiffEditor;
+type DiffEditorInstance = ReturnType<typeof monaco.editor.createDiffEditor>;
 
 const CUSTOM_THEME_NAME = 'enso-diff-theme';
 
@@ -129,20 +127,29 @@ export function DiffViewer({
 
   const editorRef = useRef<DiffEditorInstance | null>(null);
   const modelsRef = useRef<{
-    original: monaco.editor.ITextModel | null;
-    modified: monaco.editor.ITextModel | null;
+    original: ReturnType<typeof monaco.editor.createModel> | null;
+    modified: ReturnType<typeof monaco.editor.createModel> | null;
   }>({
     original: null,
     modified: null,
   });
   const [currentDiffIndex, setCurrentDiffIndex] = useState(-1);
-  const [lineChanges, setLineChanges] = useState<monaco.editor.ILineChange[]>([]);
+  const [lineChanges, setLineChanges] = useState<ReturnType<DiffEditorInstance['getLineChanges']>>(
+    []
+  );
   const [boundaryHint, setBoundaryHint] = useState<'top' | 'bottom' | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const hasAutoNavigatedRef = useRef(false);
+  const [isThemeReady, setIsThemeReady] = useState(false);
 
-  // Define theme
-  defineMonacoDiffTheme(terminalTheme);
+  // Define theme on mount and when terminal theme changes
+  useEffect(() => {
+    defineMonacoDiffTheme(terminalTheme);
+    // Force re-render after theme is defined
+    if (!isThemeReady) {
+      setIsThemeReady(true);
+    }
+  }, [terminalTheme, isThemeReady]);
 
   // Reset internal state (don't dispose models - let @monaco-editor/react handle that)
   const resetEditorState = useCallback(() => {
@@ -154,10 +161,10 @@ export function DiffViewer({
 
   // Highlight current diff range
   const highlightCurrentDiff = useCallback(
-    (index: number, changes?: monaco.editor.ILineChange[]) => {
+    (index: number, changes?: ReturnType<DiffEditorInstance['getLineChanges']>) => {
       const editor = editorRef.current;
       const effectiveChanges = changes || lineChanges;
-      if (!editor || effectiveChanges.length === 0 || index < 0) {
+      if (!editor || !effectiveChanges || effectiveChanges.length === 0 || index < 0) {
         // Clear decorations
         if (editor) {
           const modifiedEditor = editor.getModifiedEditor();
@@ -461,11 +468,13 @@ export function DiffViewer({
 
       {/* Diff Editor */}
       <div className="flex-1">
-        {diff && diff.original != null && diff.modified != null && (
+        {diff && diff.original != null && diff.modified != null && isThemeReady && (
           <DiffEditor
-            key={`${file.path}-${file.staged}`}
+            key={`${file.path}-${file.staged}-${isThemeReady}`}
             original={diff.original}
             modified={diff.modified}
+            originalModelPath={`inmemory://original/${file.path}`}
+            modifiedModelPath={`inmemory://modified/${file.path}`}
             language={getLanguageFromPath(file.path)}
             theme={CUSTOM_THEME_NAME}
             onMount={handleEditorMount}

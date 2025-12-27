@@ -28,6 +28,40 @@ self.MonacoEnvironment = {
 // Tell @monaco-editor/react to use our pre-configured monaco instance
 loader.config({ monaco });
 
+// Pre-initialize Monaco to ensure it's ready before any editor renders
+const loadedMonaco = await loader.init();
+
+// Pre-create models to trigger language feature loading (tokenizers are lazy-loaded)
+// This ensures syntax highlighting works immediately for DiffEditor
+const preloadLanguages = [
+  'typescript',
+  'javascript',
+  'json',
+  'markdown',
+  'css',
+  'scss',
+  'html',
+  'xml',
+  'yaml',
+  'python',
+  'go',
+  'rust',
+  'swift',
+  'java',
+  'kotlin',
+  'shell',
+  'sql',
+  'graphql',
+];
+for (const lang of preloadLanguages) {
+  try {
+    const tempModel = monaco.editor.createModel('', lang);
+    tempModel.dispose();
+  } catch {
+    // Language may not be supported by Monaco, skip silently
+  }
+}
+
 // Languages to highlight with Shiki (not natively supported by Monaco)
 const SHIKI_LANGUAGES = ['vue', 'svelte', 'astro'];
 const SHIKI_THEMES = ['vitesse-dark', 'vitesse-light'];
