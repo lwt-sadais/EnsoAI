@@ -86,7 +86,6 @@ export default function App() {
 
   const worktreeError = useWorktreeStore((s) => s.error);
   const switchEditorWorktree = useEditorStore((s) => s.switchWorktree);
-  const clearAllEditorStates = useEditorStore((s) => s.clearAllWorktreeStates);
   const clearEditorWorktreeState = useEditorStore((s) => s.clearWorktreeState);
 
   // Initialize settings store (for theme hydration)
@@ -281,6 +280,15 @@ export default function App() {
     }
   }, [activeWorktree]);
 
+  // Sync editor state with active worktree
+  const currentEditorWorktree = useEditorStore((s) => s.currentWorktreePath);
+  useEffect(() => {
+    const targetPath = activeWorktree?.path ?? null;
+    if (targetPath !== currentEditorWorktree) {
+      switchEditorWorktree(targetPath);
+    }
+  }, [activeWorktree, currentEditorWorktree, switchEditorWorktree]);
+
   // Sync Claude IDE Bridge with active worktree
   const claudeCodeIntegration = useSettingsStore((s) => s.claudeCodeIntegration);
   useEffect(() => {
@@ -307,7 +315,7 @@ export default function App() {
   const handleSelectRepo = (repoPath: string) => {
     setSelectedRepo(repoPath);
     setActiveWorktree(null);
-    clearAllEditorStates(); // Clear all editor states when switching repo
+    // Editor state will be synced by useEffect
   };
 
   const handleSelectWorktree = useCallback(
@@ -320,17 +328,14 @@ export default function App() {
         }));
       }
 
-      // Switch editor state to new worktree (saves current tabs, loads saved tabs)
-      switchEditorWorktree(worktree.path);
-
-      // Switch to new worktree
+      // Switch to new worktree (editor state will be synced by useEffect)
       setActiveWorktree(worktree);
 
       // Restore the new worktree's tab state (default to 'chat')
       const savedTab = worktreeTabMap[worktree.path] || 'chat';
       setActiveTab(savedTab);
     },
-    [activeWorktree, activeTab, worktreeTabMap, switchEditorWorktree]
+    [activeWorktree, activeTab, worktreeTabMap]
   );
 
   // Handle switching worktree by path (used by notification click)
