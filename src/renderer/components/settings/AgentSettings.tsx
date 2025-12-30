@@ -123,7 +123,7 @@ export function AgentSettings() {
   const [editingAgent, setEditingAgent] = React.useState<CustomAgent | null>(null);
   const [isAddingAgent, setIsAddingAgent] = React.useState(false);
 
-  // Detect a single agent
+  // Detect a single agent (auto-disable if not installed)
   const detectSingleAgent = React.useCallback(
     async (agentId: string, customAgent?: CustomAgent) => {
       setLoadingAgents((prev) => new Set([...prev, agentId]));
@@ -134,6 +134,10 @@ export function AgentSettings() {
           version: result.version,
           detectedAt: Date.now(),
         });
+        // Auto-disable if not installed
+        if (!result.installed && agentSettings[agentId]?.enabled) {
+          setAgentEnabled(agentId, false);
+        }
       } finally {
         setLoadingAgents((prev) => {
           const next = new Set(prev);
@@ -142,10 +146,10 @@ export function AgentSettings() {
         });
       }
     },
-    [setAgentDetectionStatus]
+    [agentSettings, setAgentDetectionStatus, setAgentEnabled]
   );
 
-  // Refresh only enabled agents
+  // Refresh only enabled agents (auto-disable if not installed)
   const refreshEnabledAgents = React.useCallback(async () => {
     const enabledAgentIds = Object.entries(agentSettings)
       .filter(([, config]) => config.enabled)
@@ -156,7 +160,7 @@ export function AgentSettings() {
     setLoadingAgents(new Set(enabledAgentIds));
 
     try {
-      await Promise.all(
+      const results = await Promise.all(
         enabledAgentIds.map(async (agentId) => {
           const customAgent = customAgents.find((a) => a.id === agentId);
           const result = await window.electronAPI.cli.detectOne(agentId, customAgent);
@@ -165,12 +169,19 @@ export function AgentSettings() {
             version: result.version,
             detectedAt: Date.now(),
           });
+          return { agentId, installed: result.installed };
         })
       );
+      // Auto-disable agents that are not installed
+      for (const { agentId, installed } of results) {
+        if (!installed) {
+          setAgentEnabled(agentId, false);
+        }
+      }
     } finally {
       setLoadingAgents(new Set());
     }
-  }, [agentSettings, customAgents, setAgentDetectionStatus]);
+  }, [agentSettings, customAgents, setAgentDetectionStatus, setAgentEnabled]);
 
   const handleEnabledChange = (agentId: string, enabled: boolean) => {
     setAgentEnabled(agentId, enabled);
