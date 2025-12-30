@@ -1,6 +1,6 @@
 import type { Locale } from '@shared/i18n';
 import { normalizeLocale } from '@shared/i18n';
-import type { BuiltinAgentId, CustomAgent, ShellConfig } from '@shared/types';
+import type { BuiltinAgentId, CustomAgent, ProxySettings, ShellConfig } from '@shared/types';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
@@ -232,6 +232,13 @@ export const defaultHapiSettings: HapiSettings = {
   happyEnabled: false,
 };
 
+// Proxy settings default
+export const defaultProxySettings: ProxySettings = {
+  enabled: false,
+  server: '',
+  bypassList: 'localhost,127.0.0.1',
+};
+
 // Editor settings
 export type EditorLineNumbers = 'on' | 'off' | 'relative';
 export type EditorWordWrap = 'on' | 'off' | 'wordWrapColumn' | 'bounded';
@@ -376,6 +383,7 @@ interface SettingsState {
   allowNightlyUpdates: boolean;
   hapiSettings: HapiSettings;
   defaultWorktreePath: string; // Default path for creating worktrees
+  proxySettings: ProxySettings;
 
   setTheme: (theme: Theme) => void;
   setLanguage: (language: Locale) => void;
@@ -410,6 +418,7 @@ interface SettingsState {
   setAllowNightlyUpdates: (enabled: boolean) => void;
   setHapiSettings: (settings: Partial<HapiSettings>) => void;
   setDefaultWorktreePath: (path: string) => void;
+  setProxySettings: (settings: Partial<ProxySettings>) => void;
 }
 
 const defaultAgentSettings: AgentSettings = {
@@ -456,6 +465,7 @@ export const useSettingsStore = create<SettingsState>()(
       allowNightlyUpdates: false,
       hapiSettings: defaultHapiSettings,
       defaultWorktreePath: '', // Empty means use default ~/ensoai/workspaces
+      proxySettings: defaultProxySettings,
 
       setTheme: (theme) => {
         const terminalTheme = get().terminalTheme;
@@ -581,10 +591,67 @@ export const useSettingsStore = create<SettingsState>()(
           hapiSettings: { ...state.hapiSettings, ...settings },
         })),
       setDefaultWorktreePath: (defaultWorktreePath) => set({ defaultWorktreePath }),
+      setProxySettings: (settings) => {
+        set((state) => ({
+          proxySettings: { ...state.proxySettings, ...settings },
+        }));
+        // Notify main process to apply proxy settings
+        const newSettings = { ...get().proxySettings, ...settings };
+        window.electronAPI.app.setProxy(newSettings);
+      },
     }),
     {
       name: 'enso-settings',
       storage: createJSONStorage(() => electronStorage),
+      // Deep merge nested objects to preserve new default fields when upgrading
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<SettingsState>;
+        return {
+          ...currentState,
+          ...persisted,
+          // Deep merge keybindings to ensure new fields get default values
+          terminalKeybindings: {
+            ...currentState.terminalKeybindings,
+            ...persisted.terminalKeybindings,
+          },
+          mainTabKeybindings: {
+            ...currentState.mainTabKeybindings,
+            ...persisted.mainTabKeybindings,
+          },
+          agentKeybindings: {
+            ...currentState.agentKeybindings,
+            ...persisted.agentKeybindings,
+          },
+          sourceControlKeybindings: {
+            ...currentState.sourceControlKeybindings,
+            ...persisted.sourceControlKeybindings,
+          },
+          searchKeybindings: {
+            ...currentState.searchKeybindings,
+            ...persisted.searchKeybindings,
+          },
+          editorSettings: {
+            ...currentState.editorSettings,
+            ...persisted.editorSettings,
+          },
+          claudeCodeIntegration: {
+            ...currentState.claudeCodeIntegration,
+            ...persisted.claudeCodeIntegration,
+          },
+          commitMessageGenerator: {
+            ...currentState.commitMessageGenerator,
+            ...persisted.commitMessageGenerator,
+          },
+          codeReview: {
+            ...currentState.codeReview,
+            ...persisted.codeReview,
+          },
+          hapiSettings: {
+            ...currentState.hapiSettings,
+            ...persisted.hapiSettings,
+          },
+        };
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           if (state.theme === 'sync-terminal') {
@@ -596,6 +663,10 @@ export const useSettingsStore = create<SettingsState>()(
           const resolvedLanguage = normalizeLocale(state.language);
           document.documentElement.lang = resolvedLanguage === 'zh' ? 'zh-CN' : 'en';
           window.electronAPI.app.setLanguage(resolvedLanguage);
+          // Apply proxy settings on startup
+          if (state.proxySettings) {
+            window.electronAPI.app.setProxy(state.proxySettings);
+          }
         }
       },
     }
