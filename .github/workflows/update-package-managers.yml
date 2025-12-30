@@ -237,11 +237,122 @@ jobs:
       - name: Wait for release assets
         run: sleep 60
 
-      - name: Submit to WinGet
-        uses: vedantmgoyal9/winget-releaser@main
+      - name: Download and calculate SHA256
+        id: sha
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          curl -sLO "https://github.com/J3n5en/EnsoAI/releases/download/${TAG}/EnsoAI-Setup-${VERSION}.exe"
+          HASH=$(sha256sum "EnsoAI-Setup-${VERSION}.exe" | cut -d' ' -f1 | tr '[:lower:]' '[:upper:]')
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Checkout winget-pkgs fork
+        uses: actions/checkout@v4
         with:
-          identifier: J3n5en.EnsoAI
-          version: ${{ steps.version.outputs.version }}
-          release-tag: ${{ steps.version.outputs.tag }}
-          installers-regex: 'EnsoAI-Setup-[\d\.]+\.exe$'
+          repository: J3n5en/winget-pkgs
           token: ${{ secrets.WINGET_TOKEN }}
+          path: winget-pkgs
+
+      - name: Sync fork with upstream
+        working-directory: winget-pkgs
+        run: |
+          git remote add upstream https://github.com/microsoft/winget-pkgs.git || true
+          git fetch upstream
+          git reset --hard upstream/master
+
+      - name: Create manifest files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+          HASH: ${{ steps.sha.outputs.hash }}
+        run: |
+          MANIFEST_DIR="winget-pkgs/manifests/j/J3n5en/EnsoAI/${VERSION}"
+          mkdir -p "$MANIFEST_DIR"
+
+          # installer.yaml - explicitly set Architecture: x64 (komac bug workaround)
+          cat > "$MANIFEST_DIR/J3n5en.EnsoAI.installer.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+
+          PackageIdentifier: J3n5en.EnsoAI
+          PackageVersion: ${VERSION}
+          InstallerType: nullsoft
+          Scope: user
+          InstallModes:
+            - interactive
+            - silent
+            - silentWithProgress
+          UpgradeBehavior: install
+          Installers:
+            - Architecture: x64
+              InstallerUrl: https://github.com/J3n5en/EnsoAI/releases/download/${TAG}/EnsoAI-Setup-${VERSION}.exe
+              InstallerSha256: ${HASH}
+              InstallerSwitches:
+                Silent: /S
+                SilentWithProgress: /S
+          ManifestType: installer
+          ManifestVersion: 1.6.0
+          EOF
+
+          # locale.yaml
+          cat > "$MANIFEST_DIR/J3n5en.EnsoAI.locale.en-US.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+          PackageIdentifier: J3n5en.EnsoAI
+          PackageVersion: ${VERSION}
+          PackageLocale: en-US
+          Publisher: J3n5en
+          PublisherUrl: https://github.com/J3n5en
+          PublisherSupportUrl: https://github.com/J3n5en/EnsoAI/issues
+          PackageName: EnsoAI
+          PackageUrl: https://github.com/J3n5en/EnsoAI
+          License: MIT
+          LicenseUrl: https://github.com/J3n5en/EnsoAI/blob/main/LICENSE
+          ShortDescription: Git Worktree Manager with AI Agent
+          Tags:
+            - ai
+            - git
+            - worktree
+            - developer-tools
+          ManifestType: defaultLocale
+          ManifestVersion: 1.6.0
+          EOF
+
+          # version.yaml
+          cat > "$MANIFEST_DIR/J3n5en.EnsoAI.yaml" << EOF
+          # yaml-language-server: \$schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
+
+          PackageIdentifier: J3n5en.EnsoAI
+          PackageVersion: ${VERSION}
+          DefaultLocale: en-US
+          ManifestType: version
+          ManifestVersion: 1.6.0
+          EOF
+
+          # Remove leading spaces from heredoc
+          sed -i 's/^          //' "$MANIFEST_DIR"/*.yaml
+
+      - name: Create branch and commit
+        id: branch
+        working-directory: winget-pkgs
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="ensoai-${VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add manifests/j/J3n5en/EnsoAI/
+          git commit -m "New version: J3n5en.EnsoAI version ${VERSION}"
+          git push -u origin "$BRANCH" --force
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="${{ steps.branch.outputs.branch }}"
+          gh pr create \
+            --repo microsoft/winget-pkgs \
+            --head "J3n5en:${BRANCH}" \
+            --title "New version: J3n5en.EnsoAI version ${VERSION}" \
+            --body "" || echo "PR may already exist"
