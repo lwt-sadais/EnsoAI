@@ -1,8 +1,9 @@
 import type { Locale } from '@shared/i18n';
 import type { ShellInfo } from '@shared/types';
-import { Columns3, RefreshCw, TreePine } from 'lucide-react';
+import { Columns3, FolderOpen, RefreshCw, TreePine } from 'lucide-react';
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectItem,
@@ -43,6 +44,10 @@ export function GeneralSettings() {
     setAgentNotificationEnterDelay,
     allowNightlyUpdates,
     setAllowNightlyUpdates,
+    defaultWorktreePath,
+    setDefaultWorktreePath,
+    proxySettings,
+    setProxySettings,
   } = useSettingsStore();
   const { t, locale } = useI18n();
 
@@ -116,6 +121,42 @@ export function GeneralSettings() {
 
   // Update status state
   const [updateStatus, setUpdateStatus] = React.useState<UpdateStatus | null>(null);
+
+  // Proxy test state
+  const [proxyTestStatus, setProxyTestStatus] = React.useState<
+    'idle' | 'testing' | 'success' | 'error'
+  >('idle');
+  const [proxyTestLatency, setProxyTestLatency] = React.useState<number | null>(null);
+  const [proxyTestError, setProxyTestError] = React.useState<string | null>(null);
+
+  const handleTestProxy = React.useCallback(async () => {
+    if (!proxySettings.server) return;
+
+    setProxyTestStatus('testing');
+    setProxyTestLatency(null);
+    setProxyTestError(null);
+
+    const result = await window.electronAPI.app.testProxy(proxySettings.server);
+
+    if (result.success) {
+      setProxyTestStatus('success');
+      setProxyTestLatency(result.latency ?? null);
+    } else {
+      setProxyTestStatus('error');
+      setProxyTestError(result.error ?? 'Unknown error');
+    }
+  }, [proxySettings.server]);
+
+  const handleProxyServerChange = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setProxySettings({ server: e.target.value });
+      // Reset test status when server changes
+      setProxyTestStatus('idle');
+      setProxyTestLatency(null);
+      setProxyTestError(null);
+    },
+    [setProxySettings]
+  );
 
   React.useEffect(() => {
     window.electronAPI.shell.detect().then((detected) => {
@@ -195,6 +236,41 @@ export function GeneralSettings() {
             <span className="text-xs text-muted-foreground text-center">{option.description}</span>
           </button>
         ))}
+      </div>
+
+      <div className="border-t pt-4">
+        <h3 className="text-lg font-medium">{t('Worktree')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Git worktree save location settings')}</p>
+      </div>
+
+      {/* Default Worktree Path */}
+      <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+        <span className="text-sm font-medium mt-2">{t('Save location')}</span>
+        <div className="space-y-1.5">
+          <div className="flex gap-2">
+            <Input
+              value={defaultWorktreePath}
+              onChange={(e) => setDefaultWorktreePath(e.target.value)}
+              placeholder="~/ensoai/workspaces"
+              className="flex-1"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={async () => {
+                const result = await window.electronAPI.dialog.openDirectory();
+                if (result) {
+                  setDefaultWorktreePath(result);
+                }
+              }}
+            >
+              <FolderOpen className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t('Default directory for new worktrees. Leave empty to use ~/ensoai/workspaces')}
+          </p>
+        </div>
       </div>
 
       <div className="border-t pt-4">
@@ -380,6 +456,97 @@ export function GeneralSettings() {
           </Select>
           <p className="text-xs text-muted-foreground">
             {t('How long to wait after pressing Enter before starting idle timer.')}
+          </p>
+        </div>
+      </div>
+
+      {/* Proxy Section */}
+      <div className="pt-4 border-t">
+        <h3 className="text-lg font-medium">{t('Proxy')}</h3>
+        <p className="text-sm text-muted-foreground">{t('Network proxy settings')}</p>
+      </div>
+
+      {/* Proxy Enable */}
+      <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+        <span className="text-sm font-medium">{t('Enable proxy')}</span>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {t('Route all network requests through proxy')}
+          </p>
+          <Switch
+            checked={proxySettings.enabled}
+            onCheckedChange={(enabled) => setProxySettings({ enabled })}
+          />
+        </div>
+      </div>
+
+      {/* Proxy Server */}
+      <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+        <span className="text-sm font-medium mt-2">{t('Proxy server')}</span>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Input
+              value={proxySettings.server}
+              onChange={handleProxyServerChange}
+              placeholder="http://127.0.0.1:7897"
+              disabled={!proxySettings.enabled}
+              className="w-64"
+              aria-invalid={
+                proxySettings.enabled &&
+                proxySettings.server &&
+                !/^((https?|socks5?h?|socks4a?):\/\/)?[\w.-]+:\d+/.test(proxySettings.server)
+              }
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={
+                !proxySettings.enabled ||
+                !proxySettings.server ||
+                !/^((https?|socks5?h?|socks4a?):\/\/)?[\w.-]+:\d+/.test(proxySettings.server) ||
+                proxyTestStatus === 'testing'
+              }
+              onClick={handleTestProxy}
+            >
+              {proxyTestStatus === 'testing' ? (
+                <>
+                  <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  {t('Testing...')}
+                </>
+              ) : (
+                t('Test')
+              )}
+            </Button>
+            {proxyTestStatus === 'success' && proxyTestLatency !== null && (
+              <span className="text-xs text-green-600 dark:text-green-400">
+                ✓ {proxyTestLatency}ms
+              </span>
+            )}
+            {proxyTestStatus === 'error' && proxyTestError && (
+              <span className="text-xs text-destructive" title={proxyTestError}>
+                ✗ {t('Failed')}
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {t('e.g., 127.0.0.1:7897 or http://proxy:8080')}
+          </p>
+        </div>
+      </div>
+
+      {/* Proxy Bypass */}
+      <div className="grid grid-cols-[100px_1fr] items-start gap-4">
+        <span className="text-sm font-medium mt-2">{t('Bypass list')}</span>
+        <div className="space-y-1.5">
+          <Input
+            value={proxySettings.bypassList}
+            onChange={(e) => setProxySettings({ bypassList: e.target.value })}
+            placeholder="localhost,127.0.0.1"
+            disabled={!proxySettings.enabled}
+            className="w-64"
+          />
+          <p className="text-xs text-muted-foreground">
+            {t('Comma-separated list of hosts that bypass the proxy')}
           </p>
         </div>
       </div>

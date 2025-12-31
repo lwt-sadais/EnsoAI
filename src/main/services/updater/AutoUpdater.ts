@@ -19,6 +19,7 @@ export interface UpdateStatus {
 class AutoUpdaterService {
   private mainWindow: BrowserWindow | null = null;
   private updateDownloaded = false;
+  private _isQuittingForUpdate = false;
 
   init(window: BrowserWindow): void {
     this.mainWindow = window;
@@ -88,12 +89,17 @@ class AutoUpdaterService {
 
   quitAndInstall(): void {
     if (this.updateDownloaded) {
+      this._isQuittingForUpdate = true;
       autoUpdater.quitAndInstall();
     }
   }
 
   isUpdateDownloaded(): boolean {
     return this.updateDownloaded;
+  }
+
+  isQuittingForUpdate(): boolean {
+    return this._isQuittingForUpdate;
   }
 
   setAllowPrerelease(allow: boolean): void {

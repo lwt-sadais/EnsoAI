@@ -52,6 +52,12 @@ scoop bucket add ensoai https://github.com/J3n5en/scoop-ensoai
 scoop install ensoai
 ```
 
+**Windows (Winget)**
+
+```powershell
+winget install J3n5en.EnsoAI
+```
+
 ### Manual Download
 
 Download the installer for your platform from [GitHub Releases](https://github.com/J3n5en/EnsoAI/releases/latest):

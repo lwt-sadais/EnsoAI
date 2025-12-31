@@ -89,7 +89,7 @@ export function UpdateNotification() {
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-      <DialogPopup className="sm:max-w-md" showCloseButton={false}>
+      <DialogPopup className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <RefreshCw className="h-5 w-5 text-primary" />

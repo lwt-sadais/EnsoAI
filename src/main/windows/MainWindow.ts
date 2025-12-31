@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { is } from '@electron-toolkit/utils';
 import { IPC_CHANNELS } from '@shared/types';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { autoUpdaterService } from '../services/updater/AutoUpdater';
 
 interface WindowState {
   width: number;
@@ -93,7 +94,8 @@ export function createMainWindow(): BrowserWindow {
   });
 
   win.on('close', (e) => {
-    if (forceClose || is.dev) {
+    // Skip confirmation if force close, dev mode, or quitting for update
+    if (forceClose || is.dev || autoUpdaterService.isQuittingForUpdate()) {
       saveWindowState(win);
       return;
     }
