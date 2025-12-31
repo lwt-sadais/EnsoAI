@@ -107,9 +107,14 @@ class CliDetector {
     return stdout;
   }
 
-  private async detectBuiltin(config: BuiltinAgentConfig): Promise<AgentCliInfo> {
+  private async detectBuiltin(
+    config: BuiltinAgentConfig,
+    customPath?: string
+  ): Promise<AgentCliInfo> {
     try {
-      const stdout = await this.execInLoginShell(`${config.command} ${config.versionFlag}`);
+      // Use customPath if provided, otherwise use default command
+      const effectiveCommand = customPath || config.command;
+      const stdout = await this.execInLoginShell(`${effectiveCommand} ${config.versionFlag}`);
 
       let version: string | undefined;
       if (config.versionRegex) {
@@ -166,10 +171,14 @@ class CliDetector {
     }
   }
 
-  async detectOne(agentId: string, customAgent?: CustomAgent): Promise<AgentCliInfo> {
+  async detectOne(
+    agentId: string,
+    customAgent?: CustomAgent,
+    customPath?: string
+  ): Promise<AgentCliInfo> {
     const builtinConfig = BUILTIN_AGENT_CONFIGS.find((c) => c.id === agentId);
     if (builtinConfig) {
-      return await this.detectBuiltin(builtinConfig);
+      return await this.detectBuiltin(builtinConfig, customPath);
     } else if (customAgent) {
       return await this.detectCustom(customAgent);
     } else {

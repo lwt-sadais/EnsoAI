@@ -7,8 +7,8 @@ import { cliInstaller } from '../services/cli/CliInstaller';
 export function registerCliHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.CLI_DETECT_ONE,
-    async (_, agentId: string, customAgent?: CustomAgent) => {
-      return await cliDetector.detectOne(agentId, customAgent);
+    async (_, agentId: string, customAgent?: CustomAgent, customPath?: string) => {
+      return await cliDetector.detectOne(agentId, customAgent, customPath);
     }
   );
 

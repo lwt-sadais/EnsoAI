@@ -12,6 +12,8 @@ export interface Session {
   name: string;
   agentId: string; // which agent CLI to use (e.g., 'claude', 'codex', 'gemini', 'claude-hapi', 'claude-happy')
   agentCommand: string; // the CLI command to run (e.g., 'claude', 'codex')
+  customPath?: string; // custom absolute path to the agent CLI (overrides agentCommand lookup)
+  customArgs?: string; // additional arguments to pass to the agent
   initialized: boolean; // true after first run, use --resume to restore
   activated?: boolean; // true after user presses Enter, only activated sessions are persisted
   repoPath: string; // repository path this session belongs to

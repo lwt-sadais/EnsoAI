@@ -11,6 +11,8 @@ interface AgentTerminalProps {
   cwd?: string;
   sessionId?: string;
   agentCommand?: string;
+  customPath?: string; // custom absolute path to the agent CLI
+  customArgs?: string; // additional arguments to pass to the agent
   environment?: 'native' | 'hapi' | 'happy';
   initialized?: boolean;
   activated?: boolean;
@@ -27,6 +29,8 @@ export function AgentTerminal({
   cwd,
   sessionId,
   agentCommand = 'claude',
+  customPath,
+  customArgs,
   environment = 'native',
   initialized,
   activated,
@@ -84,6 +88,9 @@ export function AgentTerminal({
       return { command: undefined, env: undefined };
     }
 
+    // Use custom path if provided, otherwise use agentCommand
+    const effectiveCommand = customPath || agentCommand;
+
     const supportsSession = agentCommand === 'claude';
     const supportIde = agentCommand === 'claude';
     const agentArgs =
@@ -94,6 +101,11 @@ export function AgentTerminal({
         : [];
     if (supportIde) {
       agentArgs.push('--ide');
+    }
+
+    // Append custom args if provided
+    if (customArgs) {
+      agentArgs.push(customArgs);
     }
 
     const isWindows = window.electronAPI?.env?.platform === 'win32';
@@ -108,7 +120,7 @@ export function AgentTerminal({
 
       // Use global 'hapi' command if installed, otherwise use npx
       const hapiPrefix = hapiGlobalInstalled ? 'hapi' : 'npx -y @twsxtd/hapi';
-      const hapiCommand = `${hapiPrefix} ${agentCommand} ${agentArgs.join(' ')}`.trim();
+      const hapiCommand = `${hapiPrefix} ${effectiveCommand} ${agentArgs.join(' ')}`.trim();
 
       // Pass CLI_API_TOKEN from hapiSettings
       if (hapiSettings.cliApiToken) {
@@ -127,7 +139,7 @@ export function AgentTerminal({
     // Happy environment: run through 'happy' command
     // claude -> happy (claude is default), codex -> happy codex
     if (environment === 'happy') {
-      const happyArgs = agentCommand === 'claude' ? '' : agentCommand;
+      const happyArgs = agentCommand === 'claude' ? '' : effectiveCommand;
       const happyCommand = `happy ${happyArgs} ${agentArgs.join(' ')}`.trim();
 
       return {
@@ -139,7 +151,7 @@ export function AgentTerminal({
       };
     }
 
-    const fullCommand = `${agentCommand} ${agentArgs.join(' ')}`.trim();
+    const fullCommand = `${effectiveCommand} ${agentArgs.join(' ')}`.trim();
     const shellName = resolvedShell.shell.toLowerCase();
 
     // WSL: detect from shell name (wsl.exe)
@@ -178,6 +190,8 @@ export function AgentTerminal({
     };
   }, [
     agentCommand,
+    customPath,
+    customArgs,
     sessionId,
     initialized,
     environment,

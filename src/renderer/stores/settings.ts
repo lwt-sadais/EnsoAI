@@ -93,6 +93,10 @@ export type TerminalRenderer = 'dom' | 'canvas' | 'webgl';
 export interface AgentConfig {
   enabled: boolean;
   isDefault: boolean;
+  /** Custom absolute path to the agent CLI (overrides default command lookup) */
+  customPath?: string;
+  /** Additional arguments to pass to the agent CLI */
+  customArgs?: string;
 }
 
 export type AgentSettings = Record<string, AgentConfig>;
@@ -413,6 +417,10 @@ interface SettingsState {
   setEditorSettings: (settings: Partial<EditorSettings>) => void;
   setAgentEnabled: (agentId: string, enabled: boolean) => void;
   setAgentDefault: (agentId: string) => void;
+  setAgentCustomConfig: (
+    agentId: string,
+    config: { customPath?: string; customArgs?: string }
+  ) => void;
   setAgentDetectionStatus: (agentId: string, info: AgentDetectionInfo) => void;
   clearAgentDetectionStatus: (agentId: string) => void;
   addCustomAgent: (agent: CustomAgent) => void;
@@ -541,6 +549,19 @@ export const useSettingsStore = create<SettingsState>()(
           updated[id] = { ...updated[id], isDefault: id === agentId };
         }
         set({ agentSettings: updated });
+      },
+      setAgentCustomConfig: (agentId, config) => {
+        const current = get().agentSettings;
+        set({
+          agentSettings: {
+            ...current,
+            [agentId]: {
+              ...current[agentId],
+              customPath: config.customPath || undefined,
+              customArgs: config.customArgs || undefined,
+            },
+          },
+        });
       },
       setAgentDetectionStatus: (agentId, info) => {
         const current = get().agentDetectionStatus;

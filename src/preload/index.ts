@@ -295,8 +295,12 @@ const electronAPI = {
 
   // CLI Detector
   cli: {
-    detectOne: (agentId: string, customAgent?: CustomAgent): Promise<AgentCliInfo> =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLI_DETECT_ONE, agentId, customAgent),
+    detectOne: (
+      agentId: string,
+      customAgent?: CustomAgent,
+      customPath?: string
+    ): Promise<AgentCliInfo> =>
+      ipcRenderer.invoke(IPC_CHANNELS.CLI_DETECT_ONE, agentId, customAgent, customPath),
     // CLI Installer
     getInstallStatus: (): Promise<{ installed: boolean; path: string | null; error?: string }> =>
       ipcRenderer.invoke(IPC_CHANNELS.CLI_INSTALL_STATUS),

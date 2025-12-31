@@ -31,6 +31,75 @@ type AgentFormProps =
       onCancel: () => void;
     };
 
+// Form for editing builtin agent custom path and args
+interface BuiltinAgentFormProps {
+  agentId: string;
+  agentName: string;
+  customPath?: string;
+  customArgs?: string;
+  onSubmit: (config: { customPath?: string; customArgs?: string }) => void;
+  onCancel: () => void;
+}
+
+function BuiltinAgentForm({
+  agentName,
+  customPath: initialPath,
+  customArgs: initialArgs,
+  onSubmit,
+  onCancel,
+}: BuiltinAgentFormProps) {
+  const { t } = useI18n();
+  const [customPath, setCustomPath] = React.useState(initialPath ?? '');
+  const [customArgs, setCustomArgs] = React.useState(initialArgs ?? '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      customPath: customPath.trim() || undefined,
+      customArgs: customArgs.trim() || undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="mt-3 space-y-3">
+      <div className="space-y-1">
+        <label htmlFor="agent-path" className="text-sm font-medium">
+          {t('Absolute path')}{' '}
+          <span className="font-normal text-muted-foreground">{t('(optional)')}</span>
+        </label>
+        <Input
+          id="agent-path"
+          value={customPath}
+          onChange={(e) => setCustomPath(e.target.value)}
+          placeholder={`/usr/local/bin/${agentName.toLowerCase()}`}
+        />
+        <p className="text-xs text-muted-foreground">{t('Override default command lookup')}</p>
+      </div>
+      <div className="space-y-1">
+        <label htmlFor="agent-args" className="text-sm font-medium">
+          {t('Additional arguments')}{' '}
+          <span className="font-normal text-muted-foreground">{t('(optional)')}</span>
+        </label>
+        <Input
+          id="agent-args"
+          value={customArgs}
+          onChange={(e) => setCustomArgs(e.target.value)}
+          placeholder="--yolo --dangerously-skip-permissions"
+        />
+        <p className="text-xs text-muted-foreground">{t('Extra arguments passed to the agent')}</p>
+      </div>
+      <div className="flex justify-end gap-2 pt-1">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+          {t('Cancel')}
+        </Button>
+        <Button type="submit" size="sm">
+          {t('Save')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function AgentForm({ agent, onSubmit, onCancel }: AgentFormProps) {
   const { t } = useI18n();
   const [name, setName] = React.useState(agent?.name ?? '');
@@ -112,6 +181,7 @@ export function AgentSettings() {
     hapiSettings,
     setAgentEnabled,
     setAgentDefault,
+    setAgentCustomConfig,
     setAgentDetectionStatus,
     clearAgentDetectionStatus,
     addCustomAgent,
@@ -121,6 +191,7 @@ export function AgentSettings() {
   const { t } = useI18n();
   const [loadingAgents, setLoadingAgents] = React.useState<Set<string>>(new Set());
   const [editingAgent, setEditingAgent] = React.useState<CustomAgent | null>(null);
+  const [editingBuiltinAgent, setEditingBuiltinAgent] = React.useState<string | null>(null);
   const [isAddingAgent, setIsAddingAgent] = React.useState(false);
 
   // Detect a single agent (auto-disable if not installed)
@@ -128,7 +199,9 @@ export function AgentSettings() {
     async (agentId: string, customAgent?: CustomAgent) => {
       setLoadingAgents((prev) => new Set([...prev, agentId]));
       try {
-        const result = await window.electronAPI.cli.detectOne(agentId, customAgent);
+        // Get customPath from settings for builtin agents
+        const customPath = agentSettings[agentId]?.customPath;
+        const result = await window.electronAPI.cli.detectOne(agentId, customAgent, customPath);
         setAgentDetectionStatus(agentId, {
           installed: result.installed,
           version: result.version,
@@ -163,7 +236,8 @@ export function AgentSettings() {
       const results = await Promise.all(
         enabledAgentIds.map(async (agentId) => {
           const customAgent = customAgents.find((a) => a.id === agentId);
-          const result = await window.electronAPI.cli.detectOne(agentId, customAgent);
+          const customPath = agentSettings[agentId]?.customPath;
+          const result = await window.electronAPI.cli.detectOne(agentId, customAgent, customPath);
           setAgentDetectionStatus(agentId, {
             installed: result.installed,
             version: result.version,
@@ -373,20 +447,36 @@ export function AgentSettings() {
                             disabled={!canSetDefault}
                           />
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => detectSingleAgent(agentId)}
-                          disabled={isLoading}
-                          title={t('Detect')}
-                        >
-                          {isLoading ? (
-                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-                          ) : (
-                            <Search className="h-3 w-3" />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => setEditingBuiltinAgent(agentId)}
+                            title={t('Edit')}
+                          >
+                            <Pencil
+                              className={cn(
+                                'h-3 w-3',
+                                (config?.customPath || config?.customArgs) && 'text-primary'
+                              )}
+                            />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => detectSingleAgent(agentId)}
+                            disabled={isLoading}
+                            title={t('Detect')}
+                          >
+                            {isLoading ? (
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                            ) : (
+                              <Search className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -460,20 +550,38 @@ export function AgentSettings() {
                             />
                           </div>
                         )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6 shrink-0"
-                          onClick={() => detectSingleAgent(agentId)}
-                          disabled={isLoading}
-                          title={t('Detect')}
-                        >
-                          {isLoading ? (
-                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-                          ) : (
-                            <Search className="h-3 w-3" />
-                          )}
-                        </Button>
+                        <div className="flex items-center gap-0.5">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => setEditingBuiltinAgent(agentId)}
+                            title={t('Edit')}
+                          >
+                            <Pencil
+                              className={cn(
+                                'h-3 w-3',
+                                (agentSettings[agentId]?.customPath ||
+                                  agentSettings[agentId]?.customArgs) &&
+                                  'text-primary'
+                              )}
+                            />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 shrink-0"
+                            onClick={() => detectSingleAgent(agentId)}
+                            disabled={isLoading}
+                            title={t('Detect')}
+                          >
+                            {isLoading ? (
+                              <div className="h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+                            ) : (
+                              <Search className="h-3 w-3" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -731,6 +839,38 @@ export function AgentSettings() {
                 agent={editingAgent}
                 onSubmit={handleEditAgent}
                 onCancel={() => setEditingAgent(null)}
+              />
+            )}
+          </div>
+        </DialogPopup>
+      </Dialog>
+
+      {/* Edit Builtin Agent Dialog */}
+      <Dialog
+        open={!!editingBuiltinAgent}
+        onOpenChange={(open) => !open && setEditingBuiltinAgent(null)}
+      >
+        <DialogPopup className="sm:max-w-sm" showCloseButton={false}>
+          <div className="p-4">
+            <DialogTitle className="text-base font-medium">
+              {t('Edit')}{' '}
+              {editingBuiltinAgent &&
+                BUILTIN_AGENT_INFO[editingBuiltinAgent as BuiltinAgentId]?.name}
+            </DialogTitle>
+            {editingBuiltinAgent && (
+              <BuiltinAgentForm
+                agentId={editingBuiltinAgent}
+                agentName={
+                  BUILTIN_AGENT_INFO[editingBuiltinAgent as BuiltinAgentId]?.name ??
+                  editingBuiltinAgent
+                }
+                customPath={agentSettings[editingBuiltinAgent]?.customPath}
+                customArgs={agentSettings[editingBuiltinAgent]?.customArgs}
+                onSubmit={(config) => {
+                  setAgentCustomConfig(editingBuiltinAgent, config);
+                  setEditingBuiltinAgent(null);
+                }}
+                onCancel={() => setEditingBuiltinAgent(null)}
               />
             )}
           </div>
