@@ -519,6 +519,9 @@ export const zhTranslations: Record<string, string> = {
   'Show indentation guides': '显示缩进引导线',
   // Editing section
   Editing: '编辑',
+  'Auto-create session': '自动创建 Session',
+  'Automatically create Agent/Terminal session when activating a worktree':
+    '激活 Worktree 时自动创建 Agent/Terminal Session',
   'Auto-completion settings': '自动补全设置',
   'Auto brackets': '自动括号',
   'Auto quotes': '自动引号',

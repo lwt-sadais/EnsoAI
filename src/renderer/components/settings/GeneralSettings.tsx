@@ -46,6 +46,8 @@ export function GeneralSettings() {
     setDefaultWorktreePath,
     proxySettings,
     setProxySettings,
+    autoCreateSessionOnActivate,
+    setAutoCreateSessionOnActivate,
   } = useSettingsStore();
   const { t, locale } = useI18n();
 
@@ -233,6 +235,20 @@ export function GeneralSettings() {
             <span className="text-xs text-muted-foreground text-center">{option.description}</span>
           </button>
         ))}
+      </div>
+
+      {/* Auto-create session */}
+      <div className="grid grid-cols-[100px_1fr] items-center gap-4">
+        <span className="text-sm font-medium">{t('Auto-create session')}</span>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {t('Automatically create Agent/Terminal session when activating a worktree')}
+          </p>
+          <Switch
+            checked={autoCreateSessionOnActivate}
+            onCheckedChange={setAutoCreateSessionOnActivate}
+          />
+        </div>
       </div>
 
       <div className="border-t pt-4">

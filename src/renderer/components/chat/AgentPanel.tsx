@@ -101,8 +101,14 @@ function createSession(
 
 export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }: AgentPanelProps) {
   const { t } = useI18n();
-  const { agentSettings, agentDetectionStatus, customAgents, agentKeybindings, hapiSettings } =
-    useSettingsStore();
+  const {
+    agentSettings,
+    agentDetectionStatus,
+    customAgents,
+    agentKeybindings,
+    hapiSettings,
+    autoCreateSessionOnActivate,
+  } = useSettingsStore();
   const defaultAgentId = useMemo(() => getDefaultAgentId(agentSettings), [agentSettings]);
   const { setAgentCount, registerAgentCloseHandler } = useWorktreeActivityStore();
 
@@ -785,13 +791,25 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
     [updateCurrentGroupState]
   );
 
-  // Auto-create first group when panel becomes active and empty
+  // Auto-create first session when panel becomes active and empty (if enabled in settings)
   useEffect(() => {
-    if (isActive && cwd && groups.length === 0 && currentWorktreeSessions.length === 0) {
-      // Create initial group with new session
+    if (
+      autoCreateSessionOnActivate &&
+      isActive &&
+      cwd &&
+      groups.length === 0 &&
+      currentWorktreeSessions.length === 0
+    ) {
       handleNewSession();
     }
-  }, [isActive, cwd, groups.length, currentWorktreeSessions.length, handleNewSession]);
+  }, [
+    autoCreateSessionOnActivate,
+    isActive,
+    cwd,
+    groups.length,
+    currentWorktreeSessions.length,
+    handleNewSession,
+  ]);
 
   // Sync sessions to groups on initial load or when sessions change externally
   useEffect(() => {
@@ -1095,7 +1113,9 @@ export function AgentPanel({ repoPath, cwd, isActive = false, onSwitchWorktree }
                 onInitialized={() => handleInitialized(sessionId)}
                 onActivated={() => handleActivated(sessionId)}
                 onExit={() => handleCloseSession(sessionId, groupId || undefined)}
-                onTerminalTitleChange={(title) => updateSession(sessionId, { terminalTitle: title })}
+                onTerminalTitleChange={(title) =>
+                  updateSession(sessionId, { terminalTitle: title })
+                }
                 onSplit={() => groupId && handleSplit(groupId)}
                 canMerge={info ? info.groupIndex > 0 : false}
                 onMerge={() => groupId && handleMerge(groupId)}

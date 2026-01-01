@@ -919,8 +919,8 @@ function WorktreeTreeItem({
           />
           <div className="min-w-0 flex-1 flex flex-col">
             <span className={cn('truncate', isPrunable && 'line-through')}>{branchDisplay}</span>
-            <span className="truncate text-[10px] text-muted-foreground">
-              {worktree.path.split(/[\\/]/).pop()}
+            <span className="truncate text-[10px] text-muted-foreground" title={worktree.path}>
+              {worktree.path}
             </span>
           </div>
           {isPrunable ? (

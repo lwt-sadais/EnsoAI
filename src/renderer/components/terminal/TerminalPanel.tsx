@@ -37,6 +37,9 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
   // Global terminal IDs to keep terminals mounted across group moves
   const [globalTerminalIds, setGlobalTerminalIds] = useState<Set<string>>(new Set());
   const terminalKeybindings = useSettingsStore((state) => state.terminalKeybindings);
+  const autoCreateSessionOnActivate = useSettingsStore(
+    (state) => state.autoCreateSessionOnActivate
+  );
   const { setTerminalCount, registerTerminalCloseHandler } = useWorktreeActivityStore();
 
   // Get current worktree's state
@@ -633,12 +636,12 @@ export function TerminalPanel({ cwd, isActive = false }: TerminalPanelProps) {
     handleGroupEmpty,
   ]);
 
-  // Auto-create first terminal when panel becomes active and empty
+  // Auto-create first terminal when panel becomes active and empty (if enabled in settings)
   useEffect(() => {
-    if (isActive && cwd && groups.length === 0) {
+    if (autoCreateSessionOnActivate && isActive && cwd && groups.length === 0) {
       handleNewTerminal();
     }
-  }, [isActive, cwd, groups.length, handleNewTerminal]);
+  }, [autoCreateSessionOnActivate, isActive, cwd, groups.length, handleNewTerminal]);
 
   if (!cwd) return null;
 

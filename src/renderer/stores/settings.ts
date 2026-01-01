@@ -403,6 +403,7 @@ interface SettingsState {
   hapiSettings: HapiSettings;
   defaultWorktreePath: string; // Default path for creating worktrees
   proxySettings: ProxySettings;
+  autoCreateSessionOnActivate: boolean; // Auto-create agent/terminal session when worktree becomes active
 
   setTheme: (theme: Theme) => void;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -444,6 +445,7 @@ interface SettingsState {
   setHapiSettings: (settings: Partial<HapiSettings>) => void;
   setDefaultWorktreePath: (path: string) => void;
   setProxySettings: (settings: Partial<ProxySettings>) => void;
+  setAutoCreateSessionOnActivate: (enabled: boolean) => void;
 }
 
 const defaultAgentSettings: AgentSettings = {
@@ -498,6 +500,7 @@ export const useSettingsStore = create<SettingsState>()(
       hapiSettings: defaultHapiSettings,
       defaultWorktreePath: '', // Empty means use default ~/ensoai/workspaces
       proxySettings: defaultProxySettings,
+      autoCreateSessionOnActivate: false, // Default: don't auto-create sessions
 
       setTheme: (theme) => {
         const terminalTheme = get().terminalTheme;
@@ -659,6 +662,8 @@ export const useSettingsStore = create<SettingsState>()(
         const newSettings = { ...get().proxySettings, ...settings };
         window.electronAPI.app.setProxy(newSettings);
       },
+      setAutoCreateSessionOnActivate: (autoCreateSessionOnActivate) =>
+        set({ autoCreateSessionOnActivate }),
     }),
     {
       name: 'enso-settings',
