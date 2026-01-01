@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   ChevronRight,
   Copy,
@@ -419,30 +420,38 @@ function FileTreeNodeComponent({
       </Menu>
 
       {/* Children - 渲染 actualNode 的子节点 */}
-      {actualNode.isDirectory && isExpanded && actualNode.children && (
-        <div>
-          {actualNode.children.map((child) => (
-            <FileTreeNodeComponent
-              key={child.path}
-              node={child}
-              depth={depth + 1}
-              expandedPaths={expandedPaths}
-              selectedPath={selectedPath}
-              editingPath={editingPath}
-              editValue={editValue}
-              onToggleExpand={onToggleExpand}
-              onFileClick={onFileClick}
-              onCreateFile={onCreateFile}
-              onCreateDirectory={onCreateDirectory}
-              onStartRename={onStartRename}
-              onFinishRename={onFinishRename}
-              onEditValueChange={onEditValueChange}
-              onDelete={onDelete}
-              onCopyPath={onCopyPath}
-            />
-          ))}
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {actualNode.isDirectory && isExpanded && actualNode.children && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            {actualNode.children.map((child) => (
+              <FileTreeNodeComponent
+                key={child.path}
+                node={child}
+                depth={depth + 1}
+                expandedPaths={expandedPaths}
+                selectedPath={selectedPath}
+                editingPath={editingPath}
+                editValue={editValue}
+                onToggleExpand={onToggleExpand}
+                onFileClick={onFileClick}
+                onCreateFile={onCreateFile}
+                onCreateDirectory={onCreateDirectory}
+                onStartRename={onStartRename}
+                onFinishRename={onFinishRename}
+                onEditValueChange={onEditValueChange}
+                onDelete={onDelete}
+                onCopyPath={onCopyPath}
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

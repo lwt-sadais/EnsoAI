@@ -1,6 +1,6 @@
 import type { FileChange, FileChangeStatus } from '@shared/types';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -168,11 +168,12 @@ function FileTreeNode({
           role="button"
           tabIndex={0}
         >
-          {isExpanded ? (
-            <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          )}
+          <ChevronRight
+            className={cn(
+              'h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150',
+              isExpanded && 'rotate-90'
+            )}
+          />
           <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1 truncate text-muted-foreground" title={node.path}>
             {node.name}
@@ -207,21 +208,32 @@ function FileTreeNode({
           </div>
         </div>
 
-        {isExpanded &&
-          node.children?.map((child) => (
-            <FileTreeNode
-              key={child.path}
-              node={child}
-              level={level + 1}
-              staged={staged}
-              selectedFile={selectedFile}
-              onFileClick={onFileClick}
-              onAction={onAction}
-              actionIcon={ActionIcon}
-              actionTitle={actionTitle}
-              onDiscard={onDiscard}
-            />
-          ))}
+        <AnimatePresence initial={false}>
+          {isExpanded && node.children && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              {node.children.map((child) => (
+                <FileTreeNode
+                  key={child.path}
+                  node={child}
+                  level={level + 1}
+                  staged={staged}
+                  selectedFile={selectedFile}
+                  onFileClick={onFileClick}
+                  onAction={onAction}
+                  actionIcon={ActionIcon}
+                  actionTitle={actionTitle}
+                  onDiscard={onDiscard}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </>
     );
   }
