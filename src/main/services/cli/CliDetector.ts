@@ -159,6 +159,7 @@ class CliDetector {
           }
         });
       } catch (error) {
+        hasExited = true;
         clearTimeout(timeoutId);
         reject(error);
       }
