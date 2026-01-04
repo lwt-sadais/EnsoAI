@@ -102,6 +102,7 @@ export function EditorArea({
   const blurDisposableRef = useRef<monaco.IDisposable | null>(null);
   const activeTabPathRef = useRef<string | null>(null);
   const pendingCursorRef = useRef<PendingCursor | null>(null);
+  const editorForPathRef = useRef<string | null>(null);
 
   // Calculate breadcrumb segments from active file path
   const breadcrumbSegments = useMemo(() => {
@@ -233,18 +234,22 @@ export function EditorArea({
   }, [terminalTheme]);
 
   // Handle pending cursor navigation (jump to line and select match)
+  // Only handles same-file search; new file search is handled by handleEditorMount
   useEffect(() => {
-    if (!pendingCursor || !editorRef.current || pendingCursor.path !== activeTabPath) {
+    if (
+      !pendingCursor ||
+      !editorRef.current ||
+      pendingCursor.path !== activeTabPath ||
+      editorForPathRef.current !== activeTabPath
+    ) {
       return;
     }
 
     const editor = editorRef.current;
     const { line, column, matchLength } = pendingCursor;
-    // Convert 0-based column to 1-based for Monaco
     const startColumn = (column ?? 0) + 1;
 
     if (matchLength && matchLength > 0) {
-      // Select the matched text
       const selection = {
         startLineNumber: line,
         startColumn,
@@ -254,14 +259,11 @@ export function EditorArea({
       editor.setSelection(selection);
       editor.revealRangeInCenter(selection);
     } else {
-      // Just set cursor position
       editor.setPosition({ lineNumber: line, column: startColumn });
       editor.revealLineInCenter(line);
     }
-
     editor.focus();
 
-    // Clear the pending cursor
     onClearPendingCursor();
   }, [pendingCursor, activeTabPath, onClearPendingCursor]);
 
@@ -269,6 +271,7 @@ export function EditorArea({
     (editor, m) => {
       editorRef.current = editor;
       monacoRef.current = m;
+      editorForPathRef.current = activeTabPath;
       setEditorReady(true);
 
       // Add Cmd/Ctrl+S shortcut
@@ -314,26 +317,24 @@ export function EditorArea({
       const cursor = pendingCursorRef.current;
       if (cursor && cursor.path === activeTabPath) {
         const { line, column, matchLength } = cursor;
-        // Convert 0-based column to 1-based for Monaco
         const startColumn = (column ?? 0) + 1;
 
-        if (matchLength && matchLength > 0) {
-          // Select the matched text
-          const selection = {
-            startLineNumber: line,
-            startColumn,
-            endLineNumber: line,
-            endColumn: startColumn + matchLength,
-          };
-          editor.setSelection(selection);
-          editor.revealRangeInCenter(selection);
-        } else {
-          // Just set cursor position
-          editor.setPosition({ lineNumber: line, column: startColumn });
-          editor.revealLineInCenter(line);
-        }
-
-        editor.focus();
+        setTimeout(() => {
+          if (matchLength && matchLength > 0) {
+            const selection = {
+              startLineNumber: line,
+              startColumn,
+              endLineNumber: line,
+              endColumn: startColumn + matchLength,
+            };
+            editor.setSelection(selection);
+            editor.revealRangeInCenter(selection);
+          } else {
+            editor.setPosition({ lineNumber: line, column: startColumn });
+            editor.revealLineInCenter(line);
+          }
+          editor.focus();
+        }, 100);
         onClearPendingCursor();
       }
 
