@@ -401,17 +401,3 @@ export function AddRepositoryDialog({
     </Dialog>
   );
 }
-
-// Trigger button component for external use
-interface AddRepositoryTriggerProps {
-  onClick: () => void;
-  children: React.ReactNode;
-}
-
-export function AddRepositoryTrigger({ onClick, children }: AddRepositoryTriggerProps) {
-  return (
-    <button type="button" onClick={onClick}>
-      {children}
-    </button>
-  );
-}

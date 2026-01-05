@@ -525,12 +525,23 @@ export class GitService {
 
   /**
    * Validate if a URL is a valid Git URL (HTTPS or SSH)
+   * Supports:
+   * - HTTPS with optional port, username, and multi-level paths
+   * - SSH with optional port and multi-level paths
    */
   static isValidGitUrl(url: string): boolean {
-    // HTTPS: https://github.com/user/repo.git or https://github.com/user/repo
-    const httpsPattern = /^https?:\/\/[\w.-]+\/[\w.-]+\/[\w.-]+(?:\.git)?$/;
-    // SSH: git@github.com:user/repo.git or git@github.com:user/repo
-    const sshPattern = /^git@[\w.-]+:[\w.-]+\/[\w.-]+(?:\.git)?$/;
+    // HTTPS: supports port, username, multi-level paths
+    // e.g., https://github.com/user/repo.git
+    //       https://git.example.com:8443/user/repo
+    //       https://user@github.com/user/repo.git
+    //       https://gitlab.com/group/subgroup/repo
+    const httpsPattern = /^https?:\/\/(?:[\w-]+@)?[\w.-]+(?::\d+)?(?:\/[\w.-]+)+(?:\.git)?$/;
+    // SSH: supports port, multi-level paths
+    // e.g., git@github.com:user/repo.git
+    //       ssh://git@github.com:22/user/repo.git
+    //       git@gitlab.com:group/subgroup/repo.git
+    const sshPattern =
+      /^(?:ssh:\/\/)?(?:[\w-]+@)?[\w.-]+(?::\d+)?[:/](?:[\w.-]+\/)+[\w.-]+(?:\.git)?$/;
 
     return httpsPattern.test(url) || sshPattern.test(url);
   }
