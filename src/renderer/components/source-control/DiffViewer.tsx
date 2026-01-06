@@ -1,5 +1,6 @@
 import { DiffEditor } from '@monaco-editor/react';
-import { ChevronDown, ChevronUp, ExternalLink, FileCode } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, ChevronUp, ExternalLink, FileCode, Pencil, Save } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { monaco } from '@/components/files/monacoSetup';
 import {
@@ -9,6 +10,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty';
+import { toastManager } from '@/components/ui/toast';
 import { useFileDiff } from '@/hooks/useSourceControl';
 import { useI18n } from '@/i18n';
 import { getXtermTheme, isTerminalThemeDark } from '@/lib/ghosttyTheme';
@@ -109,9 +111,19 @@ export function DiffViewer({
   isCommitView = false,
 }: DiffViewerProps) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const { terminalTheme, sourceControlKeybindings, editorSettings } = useSettingsStore();
   const { navigationDirection, setNavigationDirection } = useSourceControlStore();
   const navigateToFile = useNavigationStore((s) => s.navigateToFile);
+
+  // Editing state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const isDirty = editedContent !== null;
+
+  // Can edit: not commit view (history is readonly)
+  const canEdit = !isCommitView;
 
   // In commit view, we don't fetch diff - we use the provided externalDiff
   const shouldFetch = !skipFetch && !isCommitView;
@@ -148,6 +160,7 @@ export function DiffViewer({
   const [boundaryHint, setBoundaryHint] = useState<'top' | 'bottom' | null>(null);
   const decorationsRef = useRef<string[]>([]);
   const hasAutoNavigatedRef = useRef(false);
+  const handleSaveRef = useRef<() => void>(() => {});
   const pendingNavigationDirectionRef = useRef<'next' | 'prev' | null>(null);
   const navigationIdRef = useRef(0); // Increment on each new file selection
   const [isThemeReady, setIsThemeReady] = useState(false);
@@ -266,39 +279,48 @@ export function DiffViewer({
   const handleEditorMount = useCallback(
     (editor: DiffEditorInstance) => {
       editorRef.current = editor;
-      editorFilePathRef.current = file?.path ?? null; // Track the file this editor is displaying
+      editorFilePathRef.current = file?.path ?? null;
 
-      // Track the current models for cleanup
       const currentModel = editor.getModel();
       if (currentModel) {
         modelsRef.current.original = currentModel.original;
         modelsRef.current.modified = currentModel.modified;
       }
 
-      // Use onDidUpdateDiff to trigger auto-navigation when diff is computed
-      const disposable = editor.onDidUpdateDiff(() => {
-        const changes = editor.getLineChanges();
-        if (changes) {
-          setLineChanges(changes);
-          lineChangesRef.current = changes;
-          // Try to perform auto-navigation immediately
-          performAutoNavigation(editor, changes);
-        }
+      const disposables: { dispose: () => void }[] = [];
+
+      disposables.push(
+        editor.onDidUpdateDiff(() => {
+          const changes = editor.getLineChanges();
+          if (changes) {
+            setLineChanges(changes);
+            lineChangesRef.current = changes;
+            performAutoNavigation(editor, changes);
+          }
+        })
+      );
+
+      const modifiedEditor = editor.getModifiedEditor();
+      disposables.push(
+        modifiedEditor.onDidChangeModelContent(() => {
+          const newContent = modifiedEditor.getValue();
+          setEditedContent(newContent);
+        })
+      );
+
+      modifiedEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        handleSaveRef.current();
       });
 
-      // Check if there's a pending navigation that should be performed
-      // Use setTimeout to ensure this runs after onDidUpdateDiff may have fired
       setTimeout(() => {
         const pendingDirection = pendingNavigationDirectionRef.current;
         if (pendingDirection && !hasAutoNavigatedRef.current) {
-          // Try to get lineChanges - they should be ready by now
           const changes = editor.getLineChanges();
           if (changes && changes.length > 0) {
             setLineChanges(changes);
             lineChangesRef.current = changes;
             performAutoNavigation(editor, changes);
           } else {
-            // If changes not ready yet, poll for them
             let attempts = 0;
             const maxAttempts = 10;
             const pollTimer = setInterval(() => {
@@ -317,8 +339,11 @@ export function DiffViewer({
         }
       }, 0);
 
-      // Store disposable for cleanup
-      return () => disposable.dispose();
+      return () => {
+        for (const d of disposables) {
+          d.dispose();
+        }
+      };
     },
     [file?.path, performAutoNavigation]
   );
@@ -447,7 +472,55 @@ export function DiffViewer({
     [lineChanges, currentDiffIndex, boundaryHint, onPrevFile, onNextFile, highlightCurrentDiff]
   );
 
-  // Keyboard shortcuts for diff navigation
+  const handleSave = useCallback(async () => {
+    if (!file || editedContent === null || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const absolutePath = `${rootPath}/${file.path}`;
+      await window.electronAPI.file.write(absolutePath, editedContent);
+
+      await queryClient.invalidateQueries({
+        queryKey: ['git', 'file-diff', rootPath, file.path],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ['git', 'file-changes', rootPath],
+      });
+
+      setEditedContent(null);
+      setIsEditing(false);
+
+      toastManager.add({
+        title: t('File saved'),
+        type: 'success',
+        timeout: 2000,
+      });
+    } catch (error) {
+      toastManager.add({
+        title: t('Failed to save file'),
+        description: error instanceof Error ? error.message : String(error),
+        type: 'error',
+        timeout: 5000,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [file, editedContent, isSaving, rootPath, queryClient, t]);
+
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
+
+  const handleToggleEdit = useCallback(() => {
+    if (isEditing && isDirty) {
+      if (!window.confirm(t('You have unsaved changes. Discard them?'))) {
+        return;
+      }
+      setEditedContent(null);
+    }
+    setIsEditing(!isEditing);
+  }, [isEditing, isDirty, t]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!file) return;
@@ -463,22 +536,25 @@ export function DiffViewer({
         navigateToDiff('next');
         return;
       }
+
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && isEditing && isDirty) {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [file, navigateToDiff, sourceControlKeybindings]);
+  }, [file, navigateToDiff, sourceControlKeybindings, isEditing, isDirty, handleSave]);
 
-  // Reset state when file changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally trigger on file change
   useEffect(() => {
-    // Reset state for new file (don't dispose models - key change will unmount/remount)
     setCurrentDiffIndex(-1);
-    // Don't reset lineChanges - let the manual fetch or onDidUpdateDiff handle it
     setBoundaryHint(null);
     hasAutoNavigatedRef.current = false;
-    // Don't reset editorRef - it will be set when the new DiffEditor mounts
-    // Also don't clear pendingNavigationDirectionRef - we want to preserve it across the file change
+    setIsEditing(false);
+    setEditedContent(null);
   }, [file?.path, file?.staged]);
 
   if (!file) {
@@ -588,6 +664,39 @@ export function DiffViewer({
           >
             <ExternalLink className="h-4 w-4" />
           </button>
+
+          {/* Edit / Save toggle */}
+          {canEdit && (
+            <>
+              {isEditing && isDirty && (
+                <button
+                  type="button"
+                  className={cn(
+                    'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                    'text-green-500 hover:bg-green-500/20 hover:text-green-400'
+                  )}
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  title={t('Save changes (Cmd+S)')}
+                >
+                  <Save className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-md transition-colors',
+                  isEditing
+                    ? 'text-primary bg-primary/10 hover:bg-primary/20'
+                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                )}
+                onClick={handleToggleEdit}
+                title={isEditing ? t('Exit edit mode') : t('Edit file')}
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -595,16 +704,16 @@ export function DiffViewer({
       <div className="flex-1">
         {diff && diff.original != null && diff.modified != null && isThemeReady && (
           <DiffEditor
-            key={`${rootPath}-${file.path}-${file.staged}-${isThemeReady}`}
+            key={`${rootPath}-${file.path}-${file.staged}-${isThemeReady}-${isEditing}`}
             original={diff.original}
-            modified={diff.modified}
+            modified={isEditing && editedContent !== null ? editedContent : diff.modified}
             originalModelPath={`inmemory://original/${rootPath}/${file.path}`}
             modifiedModelPath={`inmemory://modified/${rootPath}/${file.path}`}
             language={getLanguageFromPath(file.path)}
             theme={CUSTOM_THEME_NAME}
             onMount={handleEditorMount}
             options={{
-              readOnly: true,
+              readOnly: !isEditing,
               renderSideBySide: true,
               renderSideBySideInlineBreakpoint: 0, // Always use side-by-side
               ignoreTrimWhitespace: false,
