@@ -568,14 +568,12 @@ export default function App() {
           prunable: false,
         };
 
+        setPendingScript({
+          worktreePath: newWorktreePath,
+          script: repoSettings.initScript,
+        });
         handleSelectWorktree(newWorktree);
         setActiveTab('terminal');
-        setTimeout(() => {
-          setPendingScript({
-            worktreePath: newWorktreePath,
-            script: repoSettings.initScript,
-          });
-        }, 100);
       }
     } finally {
       refetchBranches();
