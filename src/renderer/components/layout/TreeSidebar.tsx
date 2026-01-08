@@ -1,11 +1,13 @@
 import type { GitBranch as GitBranchType, GitWorktree, WorktreeCreateOptions } from '@shared/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
+  Check,
   ChevronRight,
   Copy,
   FolderGit2,
   FolderMinus,
   FolderOpen,
+  FolderSymlink,
   GitBranch,
   GitMerge,
   PanelLeftClose,
@@ -20,6 +22,8 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ALL_GROUP_ID, type Repository, type RepositoryGroup } from '@/App/constants';
+import { CreateGroupDialog, GroupEditDialog, GroupSelector } from '@/components/group';
 import { RepositorySettingsDialog } from '@/components/repository/RepositorySettingsDialog';
 import {
   AlertDialog,
@@ -44,11 +48,6 @@ import { useWorktreeListMultiple } from '@/hooks/useWorktree';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
-
-interface Repository {
-  name: string;
-  path: string;
-}
 
 interface TreeSidebarProps {
   repositories: Repository[];
@@ -76,6 +75,13 @@ interface TreeSidebarProps {
   onOpenSettings?: () => void;
   collapsed?: boolean;
   onCollapse?: () => void;
+  groups: RepositoryGroup[];
+  activeGroupId: string;
+  onSwitchGroup: (groupId: string) => void;
+  onCreateGroup: (name: string, emoji: string) => RepositoryGroup;
+  onUpdateGroup: (groupId: string, name: string, emoji: string) => void;
+  onDeleteGroup: (groupId: string) => void;
+  onMoveToGroup?: (repoPath: string, groupId: string | null) => void;
 }
 
 export function TreeSidebar({
@@ -101,10 +107,29 @@ export function TreeSidebar({
   onOpenSettings,
   collapsed: _collapsed = false,
   onCollapse,
+  groups,
+  activeGroupId,
+  onSwitchGroup,
+  onCreateGroup,
+  onUpdateGroup,
+  onDeleteGroup,
+  onMoveToGroup,
 }: TreeSidebarProps) {
   const { t, tNode } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRepoList, setExpandedRepoList] = useState<string[]>([]);
+
+  const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
+  const [editGroupDialogOpen, setEditGroupDialogOpen] = useState(false);
+
+  const activeGroup = groups.find((g) => g.id === activeGroupId);
+  const repositoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const group of groups) {
+      counts[group.id] = repositories.filter((r) => r.groupId === group.id).length;
+    }
+    return counts;
+  }, [groups, repositories]);
 
   // Convert list to set for fast lookups
   const expandedRepos = useMemo(() => new Set(expandedRepoList), [expandedRepoList]);
@@ -369,20 +394,26 @@ export function TreeSidebar({
     setRepoToRemove(null);
   };
 
-  // Filter repos by search query (including worktree matches)
   const filteredRepos = useMemo(() => {
-    if (!searchQuery) return repositories;
-    const query = searchQuery.toLowerCase();
-    return repositories.filter((repo) => {
-      // Match repo name
-      if (repo.name.toLowerCase().includes(query)) return true;
-      // Match any worktree in this repo
-      const repoWorktrees = worktreesMap[repo.path] || [];
-      return repoWorktrees.some(
-        (wt) => wt.branch?.toLowerCase().includes(query) || wt.path.toLowerCase().includes(query)
-      );
-    });
-  }, [repositories, worktreesMap, searchQuery]);
+    let filtered = repositories;
+
+    if (activeGroupId !== ALL_GROUP_ID) {
+      filtered = filtered.filter((r) => r.groupId === activeGroupId);
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((repo) => {
+        if (repo.name.toLowerCase().includes(query)) return true;
+        const repoWorktrees = worktreesMap[repo.path] || [];
+        return repoWorktrees.some(
+          (wt) => wt.branch?.toLowerCase().includes(query) || wt.path.toLowerCase().includes(query)
+        );
+      });
+    }
+
+    return filtered;
+  }, [repositories, worktreesMap, searchQuery, activeGroupId]);
 
   // Filter worktrees for a specific repo
   const getFilteredWorktrees = useCallback(
@@ -447,7 +478,16 @@ export function TreeSidebar({
         )}
       </div>
 
-      {/* Search */}
+      <GroupSelector
+        groups={groups}
+        activeGroupId={activeGroupId}
+        repositoryCounts={repositoryCounts}
+        totalCount={repositories.length}
+        onSelectGroup={onSwitchGroup}
+        onEditGroup={() => setEditGroupDialogOpen(true)}
+        onAddGroup={() => setCreateGroupDialogOpen(true)}
+      />
+
       <div className="px-3 py-2">
         <div className="flex h-8 items-center gap-2 rounded-lg border bg-background px-2">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -738,6 +778,58 @@ export function TreeSidebar({
               {t('Repository Settings')}
             </button>
 
+            {/* Move to Group submenu */}
+            {onMoveToGroup && groups.length > 0 && (
+              <div className="relative group/submenu">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                >
+                  <FolderSymlink className="h-4 w-4" />
+                  {t('Move to Group')}
+                  <ChevronRight className="ml-auto h-3.5 w-3.5" />
+                </button>
+                <div className="absolute left-full top-0 z-50 min-w-36 rounded-lg border bg-popover p-1 shadow-lg opacity-0 invisible group-hover/submenu:opacity-100 group-hover/submenu:visible transition-all">
+                  {/* No Group option */}
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                    onClick={() => {
+                      setRepoMenuOpen(false);
+                      if (repoMenuTarget) {
+                        onMoveToGroup(repoMenuTarget.path, null);
+                      }
+                    }}
+                  >
+                    <span className="w-4 h-4 flex items-center justify-center">
+                      {!repoMenuTarget?.groupId && <Check className="h-3.5 w-3.5" />}
+                    </span>
+                    <span className="text-muted-foreground">{t('No Group')}</span>
+                  </button>
+                  <div className="my-1 h-px bg-border" />
+                  {groups.map((group) => (
+                    <button
+                      key={group.id}
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                      onClick={() => {
+                        setRepoMenuOpen(false);
+                        if (repoMenuTarget) {
+                          onMoveToGroup(repoMenuTarget.path, group.id);
+                        }
+                      }}
+                    >
+                      <span className="w-4 h-4 flex items-center justify-center">
+                        {repoMenuTarget?.groupId === group.id && <Check className="h-3.5 w-3.5" />}
+                      </span>
+                      <span>{group.emoji}</span>
+                      <span className="truncate">{group.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Separator */}
             <div className="my-1 h-px bg-border" />
 
@@ -912,6 +1004,21 @@ export function TreeSidebar({
           repoName={repoSettingsTarget.name}
         />
       )}
+
+      <CreateGroupDialog
+        open={createGroupDialogOpen}
+        onOpenChange={setCreateGroupDialogOpen}
+        onSubmit={onCreateGroup}
+      />
+
+      <GroupEditDialog
+        open={editGroupDialogOpen}
+        onOpenChange={setEditGroupDialogOpen}
+        group={activeGroup || null}
+        repositoryCount={activeGroup ? repositoryCounts[activeGroup.id] || 0 : 0}
+        onUpdate={onUpdateGroup}
+        onDelete={onDeleteGroup}
+      />
     </aside>
   );
 }
