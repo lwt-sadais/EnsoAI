@@ -1,4 +1,11 @@
-import { ALL_GROUP_ID, DEFAULT_TAB_ORDER, type RepositoryGroup, type TabId } from './constants';
+import { normalizeHexColor } from '@/lib/colors';
+import {
+  ALL_GROUP_ID,
+  DEFAULT_GROUP_COLOR,
+  DEFAULT_TAB_ORDER,
+  type RepositoryGroup,
+  type TabId,
+} from './constants';
 
 // Storage keys
 export const STORAGE_KEYS = {
@@ -188,7 +195,29 @@ export const getStoredGroups = (): RepositoryGroup[] => {
   const saved = localStorage.getItem(STORAGE_KEYS.REPOSITORY_GROUPS);
   if (saved) {
     try {
-      return JSON.parse(saved) as RepositoryGroup[];
+      const parsed = JSON.parse(saved) as unknown;
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed
+        .map((raw, index) => {
+          const group = raw as Partial<RepositoryGroup>;
+          const color = normalizeHexColor(String(group.color ?? ''), DEFAULT_GROUP_COLOR);
+
+          const id = typeof group.id === 'string' && group.id ? group.id : '';
+          if (!id) return null;
+
+          const parsedOrder = Number(group.order);
+          const order = Number.isFinite(parsedOrder) ? parsedOrder : index;
+
+          return {
+            id,
+            name: String(group.name ?? ''),
+            emoji: typeof group.emoji === 'string' ? group.emoji : '',
+            order,
+            color,
+          };
+        })
+        .filter((g): g is RepositoryGroup => !!g);
     } catch {
       return [];
     }

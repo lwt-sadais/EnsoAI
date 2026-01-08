@@ -7,8 +7,10 @@ import type {
 } from '@shared/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { normalizeHexColor } from '@/lib/colors';
 import {
   ALL_GROUP_ID,
+  DEFAULT_GROUP_COLOR,
   generateGroupId,
   panelTransition,
   type Repository,
@@ -320,11 +322,13 @@ export default function App() {
   }, [groups]);
 
   const handleCreateGroup = useCallback(
-    (name: string, emoji: string) => {
+    (name: string, emoji: string, color: string) => {
+      const normalizedColor = normalizeHexColor(color, DEFAULT_GROUP_COLOR);
       const newGroup: RepositoryGroup = {
         id: generateGroupId(),
         name: name.trim(),
         emoji,
+        color: normalizedColor,
         order: groups.length,
       };
       const updated = [...groups, newGroup];
@@ -336,9 +340,10 @@ export default function App() {
   );
 
   const handleUpdateGroup = useCallback(
-    (groupId: string, name: string, emoji: string) => {
+    (groupId: string, name: string, emoji: string, color: string) => {
+      const normalizedColor = normalizeHexColor(color, DEFAULT_GROUP_COLOR);
       const updated = groups.map((g) =>
-        g.id === groupId ? { ...g, name: name.trim(), emoji } : g
+        g.id === groupId ? { ...g, name: name.trim(), emoji, color: normalizedColor } : g
       );
       setGroups(updated);
       saveGroups(updated);

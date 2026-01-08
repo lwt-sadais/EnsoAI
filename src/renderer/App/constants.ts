@@ -22,6 +22,21 @@ export const ALL_GROUP_ID = '__all__';
 /** 分组 Emoji 预设 */
 export const GROUP_EMOJI_PRESETS = ['🏠', '💼', '🧪', '📦', '🎮', '📚', '🔧', '🌟', '🎯', '🚀'];
 
+/** 分组标签颜色预设（hex） */
+export const GROUP_COLOR_PRESETS = [
+  '#3b82f6', // blue
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#a855f7', // purple
+  '#06b6d4', // cyan
+  '#f97316', // orange
+  '#64748b', // slate
+] as const;
+
+/** 默认分组标签颜色 */
+export const DEFAULT_GROUP_COLOR: string = GROUP_COLOR_PRESETS[0];
+
 /** 生成分组 ID */
 export const generateGroupId = (): string =>
   `group_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -34,6 +49,8 @@ export interface RepositoryGroup {
   name: string;
   /** Emoji 图标 */
   emoji: string;
+  /** 标签颜色（hex） */
+  color: string;
   /** 显示顺序 */
   order: number;
 }

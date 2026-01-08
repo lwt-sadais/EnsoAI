@@ -74,6 +74,8 @@ export const zhTranslations: Record<string, string> = {
   Copy: '复制',
   'Copy Path': '复制路径',
   'Path copied to clipboard': '路径已复制到剪贴板',
+  Color: '颜色',
+  'Custom color': '自定义颜色',
   Create: '创建',
   'Create in progress...': '创建中...',
   'Create new branch': '创建新分支',

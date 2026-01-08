@@ -34,6 +34,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { useI18n } from '@/i18n';
+import { hexToRgba } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 
 interface Repository {
@@ -55,8 +56,8 @@ interface RepositorySidebarProps {
   groups: RepositoryGroup[];
   activeGroupId: string;
   onSwitchGroup: (groupId: string) => void;
-  onCreateGroup: (name: string, emoji: string) => RepositoryGroup;
-  onUpdateGroup: (groupId: string, name: string, emoji: string) => void;
+  onCreateGroup: (name: string, emoji: string, color: string) => RepositoryGroup;
+  onUpdateGroup: (groupId: string, name: string, emoji: string, color: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onMoveToGroup?: (repoPath: string, groupId: string | null) => void;
 }
@@ -91,6 +92,7 @@ export function RepositorySidebar({
   const [editGroupDialogOpen, setEditGroupDialogOpen] = useState(false);
 
   const activeGroup = groups.find((g) => g.id === activeGroupId);
+  const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
   const repositoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const group of groups) {
@@ -268,76 +270,106 @@ export function RepositorySidebar({
           </Empty>
         ) : (
           <div className="space-y-1">
-            {filteredRepos.map(({ repo, originalIndex }) => (
-              <div key={repo.path} className="relative">
-                {/* Drop indicator - top */}
-                {dropTargetIndex === originalIndex &&
-                  draggedIndexRef.current !== null &&
-                  draggedIndexRef.current > originalIndex && (
-                    <div className="absolute -top-0.5 left-2 right-2 h-0.5 bg-primary rounded-full" />
-                  )}
-                <button
-                  type="button"
-                  draggable={!searchQuery}
-                  onDragStart={(e) => handleDragStart(e, originalIndex, repo)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => handleDragOver(e, originalIndex)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, originalIndex)}
-                  onClick={() => onSelectRepo(repo.path)}
-                  onContextMenu={(e) => handleContextMenu(e, repo)}
-                  className={cn(
-                    'group flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors',
-                    selectedRepo === repo.path
-                      ? 'bg-accent text-accent-foreground'
-                      : 'hover:bg-accent/50',
-                    draggedIndexRef.current === originalIndex && 'opacity-50'
-                  )}
-                >
-                  {/* Repo name */}
-                  <div className="flex w-full items-center gap-2">
-                    <FolderGit2
-                      className={cn(
-                        'h-4 w-4 shrink-0',
-                        selectedRepo === repo.path
-                          ? 'text-accent-foreground'
-                          : 'text-muted-foreground'
-                      )}
-                    />
-                    <span className="truncate font-medium flex-1">{repo.name}</span>
-                    <button
-                      type="button"
-                      className="shrink-0 p-1 rounded hover:bg-muted"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setRepoSettingsTarget(repo);
-                        setRepoSettingsOpen(true);
-                      }}
-                      title={t('Repository Settings')}
-                    >
-                      <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    </button>
-                  </div>
-                  {/* Path */}
-                  <div
+            {filteredRepos.map(({ repo, originalIndex }) => {
+              const group = repo.groupId ? groupsById.get(repo.groupId) : undefined;
+              const tagBg = group ? hexToRgba(group.color, 0.12) : null;
+              const tagBorder = group ? hexToRgba(group.color, 0.35) : null;
+
+              return (
+                <div key={repo.path} className="relative">
+                  {/* Drop indicator - top */}
+                  {dropTargetIndex === originalIndex &&
+                    draggedIndexRef.current !== null &&
+                    draggedIndexRef.current > originalIndex && (
+                      <div className="absolute -top-0.5 left-2 right-2 h-0.5 bg-primary rounded-full" />
+                    )}
+                  <button
+                    type="button"
+                    draggable={!searchQuery}
+                    onDragStart={(e) => handleDragStart(e, originalIndex, repo)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleDragOver(e, originalIndex)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, originalIndex)}
+                    onClick={() => onSelectRepo(repo.path)}
+                    onContextMenu={(e) => handleContextMenu(e, repo)}
                     className={cn(
-                      'w-full truncate pl-6 text-xs',
+                      'group flex w-full flex-col items-start gap-1 rounded-lg p-3 text-left transition-colors',
                       selectedRepo === repo.path
-                        ? 'text-accent-foreground/70'
-                        : 'text-muted-foreground'
+                        ? 'bg-accent text-accent-foreground'
+                        : 'hover:bg-accent/50',
+                      draggedIndexRef.current === originalIndex && 'opacity-50'
                     )}
                   >
-                    {repo.path}
-                  </div>
-                </button>
-                {/* Drop indicator - bottom */}
-                {dropTargetIndex === originalIndex &&
-                  draggedIndexRef.current !== null &&
-                  draggedIndexRef.current < originalIndex && (
-                    <div className="absolute -bottom-0.5 left-2 right-2 h-0.5 bg-primary rounded-full" />
-                  )}
-              </div>
-            ))}
+                    {/* Repo name */}
+                    <div className="flex w-full items-center gap-2">
+                      <FolderGit2
+                        className={cn(
+                          'h-4 w-4 shrink-0',
+                          selectedRepo === repo.path
+                            ? 'text-accent-foreground'
+                            : 'text-muted-foreground'
+                        )}
+                      />
+                      <span className="truncate font-medium flex-1">{repo.name}</span>
+                      <button
+                        type="button"
+                        className="shrink-0 p-1 rounded hover:bg-muted"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRepoSettingsTarget(repo);
+                          setRepoSettingsOpen(true);
+                        }}
+                        title={t('Repository Settings')}
+                      >
+                        <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    </div>
+
+                    {/* Tags (Group) */}
+                    <div className="flex w-full items-center gap-1 pl-6">
+                      {!group ? (
+                        <span className="inline-flex h-5 items-center rounded-md border bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+                          {t('No Group')}
+                        </span>
+                      ) : (
+                        <span
+                          className="inline-flex h-5 max-w-full items-center gap-1 rounded-md border px-1.5 text-[10px] text-foreground/80"
+                          style={{
+                            backgroundColor: tagBg ?? undefined,
+                            borderColor: tagBorder ?? undefined,
+                            color: group.color,
+                          }}
+                        >
+                          {group.emoji && (
+                            <span className="text-[0.9em] opacity-90">{group.emoji}</span>
+                          )}
+                          <span className="truncate">{group.name}</span>
+                        </span>
+                      )}
+                    </div>
+                    {/* Path */}
+                    <div
+                      className={cn(
+                        'w-full pl-6 text-xs overflow-hidden whitespace-nowrap text-ellipsis [direction:rtl] [text-align:left]',
+                        selectedRepo === repo.path
+                          ? 'text-accent-foreground/70'
+                          : 'text-muted-foreground'
+                      )}
+                      title={repo.path}
+                    >
+                      {repo.path}
+                    </div>
+                  </button>
+                  {/* Drop indicator - bottom */}
+                  {dropTargetIndex === originalIndex &&
+                    draggedIndexRef.current !== null &&
+                    draggedIndexRef.current < originalIndex && (
+                      <div className="absolute -bottom-0.5 left-2 right-2 h-0.5 bg-primary rounded-full" />
+                    )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

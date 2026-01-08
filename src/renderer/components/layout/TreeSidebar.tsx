@@ -49,6 +49,7 @@ import { toastManager } from '@/components/ui/toast';
 import { CreateWorktreeDialog } from '@/components/worktree/CreateWorktreeDialog';
 import { useWorktreeListMultiple } from '@/hooks/useWorktree';
 import { useI18n } from '@/i18n';
+import { hexToRgba } from '@/lib/colors';
 import { cn } from '@/lib/utils';
 import { useWorktreeActivityStore } from '@/stores/worktreeActivity';
 
@@ -81,8 +82,8 @@ interface TreeSidebarProps {
   groups: RepositoryGroup[];
   activeGroupId: string;
   onSwitchGroup: (groupId: string) => void;
-  onCreateGroup: (name: string, emoji: string) => RepositoryGroup;
-  onUpdateGroup: (groupId: string, name: string, emoji: string) => void;
+  onCreateGroup: (name: string, emoji: string, color: string) => RepositoryGroup;
+  onUpdateGroup: (groupId: string, name: string, emoji: string, color: string) => void;
   onDeleteGroup: (groupId: string) => void;
   onMoveToGroup?: (repoPath: string, groupId: string | null) => void;
 }
@@ -126,6 +127,7 @@ export function TreeSidebar({
   const [editGroupDialogOpen, setEditGroupDialogOpen] = useState(false);
 
   const activeGroup = groups.find((g) => g.id === activeGroupId);
+  const groupsById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups]);
   const repositoryCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const group of groups) {
@@ -566,48 +568,83 @@ export function TreeSidebar({
                         toggleRepoExpanded(repo.path);
                       }}
                       className={cn(
-                        'group flex w-full items-center gap-1 rounded-lg px-2 py-2 text-left transition-colors cursor-pointer',
+                        'group flex w-full flex-col gap-1 rounded-lg px-2 py-2 text-left transition-colors cursor-pointer',
                         isSelected ? 'bg-accent/50 text-accent-foreground' : 'hover:bg-accent/30',
                         draggedRepoIndexRef.current === index && 'opacity-50'
                       )}
                     >
-                      {/* Expand/collapse chevron */}
-                      <span className="shrink-0 w-5 h-5 flex items-center justify-center">
-                        <ChevronRight
+                      {/* Row 1: Chevron + Icon + Name + Actions (vertically centered) */}
+                      <div className="flex w-full items-center gap-1">
+                        <span className="shrink-0 w-5 h-5 flex items-center justify-center">
+                          <ChevronRight
+                            className={cn(
+                              'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
+                              isExpanded && 'rotate-90'
+                            )}
+                          />
+                        </span>
+                        <FolderGit2
                           className={cn(
-                            'h-3.5 w-3.5 text-muted-foreground transition-transform duration-200',
-                            isExpanded && 'rotate-90'
+                            'h-4 w-4 shrink-0',
+                            isSelected ? 'text-accent-foreground' : 'text-muted-foreground'
                           )}
                         />
-                      </span>
-                      {/* Repo icon and name */}
-                      <FolderGit2
-                        className={cn(
-                          'h-4 w-4 shrink-0',
-                          isSelected ? 'text-accent-foreground' : 'text-muted-foreground'
-                        )}
-                      />
-                      <div className="min-w-0 flex-1 flex flex-col">
-                        <span className="truncate font-medium text-sm text-left">{repo.name}</span>
-                        <span
-                          className="overflow-hidden whitespace-nowrap text-ellipsis text-xs text-muted-foreground [direction:rtl] [text-align:left]"
-                          title={repo.path}
-                        >
-                          {repo.path}
+                        <span className="min-w-0 flex-1 truncate font-medium text-sm text-left">
+                          {repo.name}
                         </span>
+                        <button
+                          type="button"
+                          className="shrink-0 p-1 rounded hover:bg-muted"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRepoSettingsTarget(repo);
+                            setRepoSettingsOpen(true);
+                          }}
+                          title={t('Repository Settings')}
+                        >
+                          <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        className="shrink-0 p-1 rounded hover:bg-muted"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setRepoSettingsTarget(repo);
-                          setRepoSettingsOpen(true);
-                        }}
-                        title={t('Repository Settings')}
+
+                      {/* Row 2: Tags */}
+                      <div className="flex items-center gap-1 pl-6">
+                        {(() => {
+                          const group = repo.groupId ? groupsById.get(repo.groupId) : undefined;
+                          if (!group) {
+                            return (
+                              <span className="inline-flex h-5 items-center rounded-md border bg-muted/40 px-1.5 text-[10px] text-muted-foreground">
+                                {t('No Group')}
+                              </span>
+                            );
+                          }
+
+                          const bg = hexToRgba(group.color, 0.12);
+                          const border = hexToRgba(group.color, 0.35);
+                          return (
+                            <span
+                              className="inline-flex h-5 max-w-full items-center gap-1 rounded-md border px-1.5 text-[10px] text-foreground/80"
+                              style={{
+                                backgroundColor: bg ?? undefined,
+                                borderColor: border ?? undefined,
+                                color: group.color,
+                              }}
+                            >
+                              {group.emoji && (
+                                <span className="text-[0.9em] opacity-90">{group.emoji}</span>
+                              )}
+                              <span className="truncate">{group.name}</span>
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Row 3: Path */}
+                      <span
+                        className="pl-6 overflow-hidden whitespace-nowrap text-ellipsis text-xs text-muted-foreground [direction:rtl] [text-align:left]"
+                        title={repo.path}
                       >
-                        <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
+                        {repo.path}
+                      </span>
                     </button>
                     {/* Drop indicator - bottom */}
                     {dropRepoTargetIndex === index &&

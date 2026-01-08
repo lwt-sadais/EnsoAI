@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { RepositoryGroup } from '@/App/constants';
+import { DEFAULT_GROUP_COLOR, GROUP_COLOR_PRESETS, type RepositoryGroup } from '@/App/constants';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -27,7 +27,7 @@ interface GroupEditDialogProps {
   onOpenChange: (open: boolean) => void;
   group: RepositoryGroup | null;
   repositoryCount: number;
-  onUpdate: (groupId: string, name: string, emoji: string) => void;
+  onUpdate: (groupId: string, name: string, emoji: string, color: string) => void;
   onDelete: (groupId: string) => void;
 }
 
@@ -42,18 +42,20 @@ export function GroupEditDialog({
   const { t, tNode } = useI18n();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('');
+  const [color, setColor] = useState<string>(DEFAULT_GROUP_COLOR);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (group) {
       setName(group.name);
       setEmoji(group.emoji);
+      setColor(group.color || DEFAULT_GROUP_COLOR);
     }
   }, [group]);
 
   const handleSave = () => {
     if (group && name.trim()) {
-      onUpdate(group.id, name.trim(), emoji);
+      onUpdate(group.id, name.trim(), emoji, color);
       onOpenChange(false);
     }
   };
@@ -92,6 +94,35 @@ export function GroupEditDialog({
                 <label className="text-sm font-medium">{t('Icon')}</label>
                 <div className="mt-2">
                   <EmojiPicker value={emoji} onChange={setEmoji} />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium">{t('Color')}</label>
+                <div className="mt-2 grid grid-cols-8 gap-2">
+                  {GROUP_COLOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className="h-6 w-6 rounded-md border"
+                      style={{
+                        backgroundColor: preset,
+                        outline: color === preset ? `2px solid ${preset}` : undefined,
+                        outlineOffset: 2,
+                      }}
+                      onClick={() => setColor(preset)}
+                      aria-label={preset}
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">{t('Custom color')}</span>
+                  <input
+                    type="color"
+                    value={color}
+                    onChange={(e) => setColor(e.target.value)}
+                    className="h-8 w-10 rounded-md border bg-background p-1"
+                    aria-label={t('Custom color')}
+                  />
                 </div>
               </div>
             </div>

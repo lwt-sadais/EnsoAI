@@ -49,6 +49,13 @@ export function GroupSelector({
         className="group relative flex w-full h-10 cursor-pointer items-center gap-2 px-3 text-sm hover:bg-accent/50 transition-colors"
       >
         {displayEmoji && <span className="text-base shrink-0 w-5 text-center">{displayEmoji}</span>}
+        {!isAllSelected && (
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full border"
+            style={{ backgroundColor: activeGroup?.color }}
+            aria-hidden="true"
+          />
+        )}
         <span className="min-w-0 flex-1 truncate text-left font-medium">{displayName}</span>
         <span className="shrink-0 flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs text-muted-foreground">
           {displayCount}
@@ -124,6 +131,11 @@ export function GroupSelector({
                   )}
                 >
                   <span className="text-base">{group.emoji}</span>
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full border"
+                    style={{ backgroundColor: group.color }}
+                    aria-hidden="true"
+                  />
                   <span className="min-w-0 flex-1 truncate text-left">{group.name}</span>
                   <span className="shrink-0 text-xs text-muted-foreground">
                     {repositoryCounts[group.id] || 0}
