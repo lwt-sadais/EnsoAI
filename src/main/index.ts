@@ -5,14 +5,6 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { type Locale, normalizeLocale } from '@shared/i18n';
 import { IPC_CHANNELS } from '@shared/types';
 import { app, BrowserWindow, ipcMain, Menu, net, protocol } from 'electron';
-import { shellEnvSync } from 'shell-env';
-
-// Fix environment for packaged app (macOS/Linux GUI apps don't inherit shell env)
-try {
-  Object.assign(process.env, shellEnvSync());
-} catch {
-  // Ignore errors - will use default env
-}
 
 import {
   autoStartHapi,
@@ -28,7 +20,6 @@ import { isAllowedLocalFilePath } from './services/files/LocalFileAccess';
 import { checkGitInstalled } from './services/git/checkGit';
 import { setCurrentLocale } from './services/i18n';
 import { buildAppMenu } from './services/MenuBuilder';
-import { getEnhancedPath } from './services/terminal/PtyManager';
 import { createMainWindow } from './windows/MainWindow';
 
 let mainWindow: BrowserWindow | null = null;
@@ -178,8 +169,6 @@ async function initAutoUpdater(window: BrowserWindow): Promise<void> {
 }
 
 async function init(): Promise<void> {
-  process.env.PATH = getEnhancedPath();
-
   // Check Git installation
   const gitInstalled = await checkGitInstalled();
   if (!gitInstalled) {
@@ -269,7 +258,9 @@ app.whenReady().then(async () => {
   ipcMain.handle(IPC_CHANNELS.APP_SET_LANGUAGE, (_event, language: Locale) => {
     setCurrentLocale(language);
     if (!mainWindow) return;
-    const updatedMenu = buildAppMenu(mainWindow, { onNewWindow: handleNewWindow });
+    const updatedMenu = buildAppMenu(mainWindow, {
+      onNewWindow: handleNewWindow,
+    });
     Menu.setApplicationMenu(updatedMenu);
   });
 
