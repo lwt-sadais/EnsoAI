@@ -32,17 +32,21 @@ async function runWithAdminPrivileges(shellCommand: string): Promise<void> {
         stderr += data.toString();
       });
 
+      const timeoutId = setTimeout(() => {
+        proc.kill();
+        reject(new Error('Timeout waiting for admin privileges'));
+      }, 60000);
+
       proc.on('close', (code) => {
+        clearTimeout(timeoutId);
         if (code === 0) resolve();
         else reject(new Error(stderr || `osascript exited with code ${code}`));
       });
 
-      proc.on('error', reject);
-
-      setTimeout(() => {
-        proc.kill();
-        reject(new Error('Timeout waiting for admin privileges'));
-      }, 60000);
+      proc.on('error', (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      });
     });
   }
 
@@ -110,17 +114,21 @@ async function runWithAdminPrivileges(shellCommand: string): Promise<void> {
       stderr += data.toString();
     });
 
+    const timeoutId = setTimeout(() => {
+      proc.kill();
+      reject(new Error('Timeout waiting for admin privileges'));
+    }, 60000);
+
     proc.on('close', (code) => {
+      clearTimeout(timeoutId);
       if (code === 0) resolve();
       else reject(new Error(stderr || `pkexec exited with code ${code}`));
     });
 
-    proc.on('error', reject);
-
-    setTimeout(() => {
-      proc.kill();
-      reject(new Error('Timeout waiting for admin privileges'));
-    }, 60000);
+    proc.on('error', (err) => {
+      clearTimeout(timeoutId);
+      reject(err);
+    });
   });
 }
 

@@ -119,12 +119,12 @@ export async function autoStartHapi(): Promise<void> {
         // Wait for hapi to be ready before starting cloudflared
         const waitForReady = (): Promise<void> => {
           return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 60;
             const checkReady = () => {
+              attempts++;
               const status = hapiServerManager.getStatus();
-              if (status.ready) {
-                resolve();
-              } else if (!status.running) {
-                // Hapi failed to start, don't start cloudflared
+              if (status.ready || !status.running || attempts >= maxAttempts) {
                 resolve();
               } else {
                 setTimeout(checkReady, 500);
