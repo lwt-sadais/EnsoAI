@@ -1,4 +1,5 @@
 import { disposeClaudeIdeBridge } from '../services/claude/ClaudeIdeBridge';
+import { autoUpdaterService } from '../services/updater/AutoUpdater';
 import { registerAgentHandlers } from './agent';
 import { registerAppHandlers } from './app';
 import { registerClaudeConfigHandlers } from './claudeConfig';
@@ -79,6 +80,8 @@ export async function cleanupAllResources(): Promise<void> {
   clearAllGitServices();
   clearAllWorktreeServices();
 
+  autoUpdaterService.cleanup();
+
   // Dispose Claude IDE Bridge
   disposeClaudeIdeBridge();
 }
@@ -103,6 +106,8 @@ export function cleanupAllResourcesSync(): void {
   // Clear service caches (sync)
   clearAllGitServices();
   clearAllWorktreeServices();
+
+  autoUpdaterService.cleanup();
 
   // Dispose Claude IDE Bridge (sync)
   disposeClaudeIdeBridge();

@@ -8,6 +8,7 @@ import type {
   FileSearchResult,
 } from '@shared/types';
 import { rgPath as originalRgPath } from '@vscode/ripgrep';
+import { killProcessTree } from '../../utils/processUtils';
 
 const MAX_FILE_RESULTS = 100;
 const MAX_CONTENT_RESULTS = 500;
@@ -92,12 +93,11 @@ async function getAllFilesWithRipgrep(
       }
     });
 
-    // 超时处理
     const timeoutId = setTimeout(() => {
       rg.stdout.removeAllListeners('data');
       rg.removeAllListeners('close');
       rg.removeAllListeners('error');
-      rg.kill();
+      killProcessTree(rg);
       resolve(files);
     }, SEARCH_TIMEOUT_MS);
 
@@ -241,13 +241,12 @@ export class SearchService {
         stderr += data.toString();
       });
 
-      // 超时处理
       const timeoutId = setTimeout(() => {
         rg.stdout.removeAllListeners('data');
         rg.stderr.removeAllListeners('data');
         rg.removeAllListeners('close');
         rg.removeAllListeners('error');
-        rg.kill();
+        killProcessTree(rg);
         resolve({
           matches,
           totalMatches,

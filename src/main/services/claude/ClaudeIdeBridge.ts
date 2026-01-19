@@ -362,14 +362,15 @@ export async function startClaudeIdeBridge(
     }
   }
 
-  // Register IPC handlers for selection/mention notifications from renderer
-  ipcMain.on(IPC_CHANNELS.MCP_SELECTION_CHANGED, (_, params: SelectionChangedParams) => {
+  // IPC handlers for selection/mention notifications from renderer
+  const onSelectionChanged = (_: Electron.IpcMainEvent, params: SelectionChangedParams) => {
     sendNotification('selection_changed', params);
-  });
-
-  ipcMain.on(IPC_CHANNELS.MCP_AT_MENTIONED, (_, params: AtMentionedParams) => {
+  };
+  const onAtMentioned = (_: Electron.IpcMainEvent, params: AtMentionedParams) => {
     sendNotification('at_mentioned', params);
-  });
+  };
+  ipcMain.on(IPC_CHANNELS.MCP_SELECTION_CHANGED, onSelectionChanged);
+  ipcMain.on(IPC_CHANNELS.MCP_AT_MENTIONED, onAtMentioned);
 
   wss.on('connection', (ws, req) => {
     const token = req.headers['x-claude-code-ide-authorization'];
@@ -471,6 +472,8 @@ export async function startClaudeIdeBridge(
     },
     dispose(): void {
       deleteLockFile(port);
+      ipcMain.removeListener(IPC_CHANNELS.MCP_SELECTION_CHANGED, onSelectionChanged);
+      ipcMain.removeListener(IPC_CHANNELS.MCP_AT_MENTIONED, onAtMentioned);
       try {
         wss.close();
       } catch {
