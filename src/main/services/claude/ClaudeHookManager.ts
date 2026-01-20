@@ -32,7 +32,8 @@ interface StatusLineBackup {
   backupTime: string;
 }
 
-// Hook is identified by the script path 'ensoai-stop.js' in the command
+// Hook is identified by the script path 'ensoai-stop' in the command
+// Use .cjs extension to force CommonJS mode regardless of user's package.json "type" setting
 
 function getClaudeConfigDir(): string {
   if (process.env.CLAUDE_CONFIG_DIR) {
@@ -50,7 +51,7 @@ function getHooksDir(): string {
 }
 
 function getHookScriptPath(): string {
-  return path.join(getHooksDir(), 'ensoai-stop.js');
+  return path.join(getHooksDir(), 'ensoai-stop.cjs');
 }
 
 /**
@@ -130,19 +131,20 @@ main().catch(() => process.exit(0));
 `;
 }
 
-/**
- * Ensure hook script file exists
- */
 function ensureHookScript(): string {
   const hooksDir = getHooksDir();
   const scriptPath = getHookScriptPath();
 
-  // Create hooks directory if needed
   if (!fs.existsSync(hooksDir)) {
     fs.mkdirSync(hooksDir, { recursive: true, mode: 0o755 });
   }
 
-  // Write script file
+  // TODO(v0.3.0): Remove legacy .js cleanup
+  const legacyScriptPath = path.join(hooksDir, 'ensoai-stop.js');
+  if (fs.existsSync(legacyScriptPath)) {
+    fs.unlinkSync(legacyScriptPath);
+  }
+
   fs.writeFileSync(scriptPath, getHookScriptContent(), { mode: 0o755 });
 
   return scriptPath;
@@ -162,15 +164,16 @@ function generateHookCommand(): string {
 
 /**
  * Check if EnsoAI Stop hook is already configured
- * Identifies our hook by the ensoai-stop.js script path
+ * Identifies our hook by the ensoai-stop script path (supports both .js and .cjs)
  */
 function isHookConfigured(settings: ClaudeSettings): boolean {
   const stopHooks = settings.hooks?.Stop;
   if (!Array.isArray(stopHooks)) return false;
 
+  // TODO(v0.3.0): Remove .js compatibility, match only 'ensoai-stop.cjs'
   return stopHooks.some((hookGroup) =>
     hookGroup.hooks?.some(
-      (hook) => hook.type === 'command' && hook.command?.includes('ensoai-stop.js')
+      (hook) => hook.type === 'command' && hook.command?.includes('ensoai-stop')
     )
   );
 }
@@ -273,11 +276,11 @@ export function removeStopHook(): boolean {
       return true;
     }
 
-    // Filter out our hooks (identified by ensoai-stop.js script path)
+    // TODO(v0.3.0): Remove .js compatibility, match only 'ensoai-stop.cjs'
     settings.hooks.Stop = settings.hooks.Stop.filter(
       (hookGroup) =>
         !hookGroup.hooks?.some(
-          (hook) => hook.type === 'command' && hook.command?.includes('ensoai-stop.js')
+          (hook) => hook.type === 'command' && hook.command?.includes('ensoai-stop')
         )
     );
 
@@ -305,7 +308,7 @@ export function removeStopHook(): boolean {
 // Status Line Hook Management
 // ============================================================================
 
-const STATUSLINE_SCRIPT_NAME = 'enso-statusline.js';
+const STATUSLINE_SCRIPT_NAME = 'enso-statusline.cjs';
 const STATUSLINE_BACKUP_FILE = 'claude-statusline-backup.json';
 
 function getStatusLineScriptPath(): string {
@@ -391,15 +394,18 @@ main().catch(() => {
 `;
 }
 
-/**
- * Ensure status line script file exists
- */
 function ensureStatusLineScript(): string {
   const hooksDir = getHooksDir();
   const scriptPath = getStatusLineScriptPath();
 
   if (!fs.existsSync(hooksDir)) {
     fs.mkdirSync(hooksDir, { recursive: true, mode: 0o755 });
+  }
+
+  // TODO(v0.3.0): Remove legacy .js cleanup
+  const legacyScriptPath = path.join(hooksDir, 'enso-statusline.js');
+  if (fs.existsSync(legacyScriptPath)) {
+    fs.unlinkSync(legacyScriptPath);
   }
 
   fs.writeFileSync(scriptPath, getStatusLineScriptContent(), { mode: 0o755 });
