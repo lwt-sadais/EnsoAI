@@ -165,23 +165,17 @@ const ProviderMenuItem = React.memo(function ProviderMenuItem({
   return (
     <div
       className={cn(
-        'flex w-full items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors',
-        isDisabled && 'opacity-60'
+        'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground',
+        isDisabled && 'opacity-50'
       )}
     >
-      {/* 主按钮区域：切换 Provider */}
       <button
         type="button"
         onClick={handleSwitch}
         disabled={isPending || isDisabled}
         className={cn(
-          'flex flex-1 items-center gap-2 whitespace-nowrap rounded-sm px-1',
-          isActive
-            ? 'text-foreground'
-            : isDisabled
-              ? 'cursor-not-allowed text-muted-foreground'
-              : 'text-muted-foreground hover:bg-accent/50 hover:text-accent-foreground',
-          isPending && 'opacity-50 cursor-not-allowed'
+          'flex flex-1 items-center gap-2 whitespace-nowrap text-left',
+          isPending && 'cursor-not-allowed'
         )}
       >
         {isActive ? (
@@ -189,9 +183,7 @@ const ProviderMenuItem = React.memo(function ProviderMenuItem({
         ) : (
           <Circle className="h-4 w-4 shrink-0" />
         )}
-        <span className={cn('flex-1 text-left', isDisabled && 'line-through')}>
-          {provider.name}
-        </span>
+        <span className={cn(isDisabled && 'line-through')}>{provider.name}</span>
       </button>
 
       {/* 禁用/启用按钮 */}
@@ -200,13 +192,9 @@ const ProviderMenuItem = React.memo(function ProviderMenuItem({
           <button
             type="button"
             onClick={handleToggleEnabled}
-            className="shrink-0 rounded p-0.5 hover:bg-accent"
+            className="shrink-0 rounded p-0.5 opacity-60 hover:opacity-100"
           >
-            {isDisabled ? (
-              <Check className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <Ban className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
+            {isDisabled ? <Check className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
           </button>
         </TooltipTrigger>
         <TooltipPopup side="right">
@@ -917,7 +905,7 @@ export function SessionBar({
                   {showProviderMenu && providers.length > 0 && (
                     <div
                       className={cn(
-                        'absolute right-[-10px] z-50 min-w-40',
+                        'absolute right-[-10px] z-50 min-w-32',
                         // 根据工具栏位置决定菜单方向
                         containerRef.current &&
                           state.y > containerRef.current.getBoundingClientRect().height / 2
@@ -937,7 +925,6 @@ export function SessionBar({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setShowProviderMenu(false);
-                                  // 分发自定义事件以打开设置面板的 Provider 部分
                                   window.dispatchEvent(new CustomEvent('open-settings-provider'));
                                 }}
                                 className="flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
@@ -989,8 +976,8 @@ export function SessionBar({
                         quickTerminalOpen
                           ? 'bg-accent text-accent-foreground'
                           : quickTerminalHasProcess
-                            ? 'bg-accent/50 text-accent-foreground hover:bg-accent/70'
-                            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                            ? 'bg-accent text-accent-foreground'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                       )}
                     >
                       <Terminal className="h-3.5 w-3.5" />
