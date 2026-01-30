@@ -12,7 +12,7 @@ body:
     id: ensoai-version
     attributes:
       label: EnsoAI 版本号
-      description: 可在应用设置或 `ensoai --version` 中查看
+      description: 可在应用设置中查看
       placeholder: "例如: 0.2.27"
     validations:
       required: true
