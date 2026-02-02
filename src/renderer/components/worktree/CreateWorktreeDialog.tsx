@@ -179,10 +179,14 @@ export function CreateWorktreeDialog({
 
   // Keep input value in sync when dropdown is closed
   React.useEffect(() => {
-    if (!baseBranchOpen && baseBranch) {
+    if (baseBranchOpen) {
+      // Clear search when opening to show all branches
+      setBaseBranchQuery('');
+    } else if (baseBranch) {
+      // Restore branch label when closing
       setBaseBranchQuery(getBranchLabel(baseBranch));
     }
-  }, [baseBranch, baseBranchOpen, getBranchLabel]);
+  }, [baseBranchOpen, baseBranch, getBranchLabel]);
 
   const loadPullRequests = React.useCallback(async () => {
     setPrsLoading(true);
@@ -459,6 +463,11 @@ export function CreateWorktreeDialog({
                     }}
                     inputValue={baseBranchQuery}
                     onInputValueChange={(value) => {
+                      // Allow clearing when dropdown is open (for showing all branches)
+                      if (value === '' && baseBranchOpen) {
+                        setBaseBranchQuery('');
+                        return;
+                      }
                       // Ignore empty string during initialization if we already have a query
                       if (value === '' && baseBranchQuery && baseBranchInitializedRef.current) {
                         return;
