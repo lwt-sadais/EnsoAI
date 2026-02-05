@@ -2,18 +2,15 @@ import { joinPath } from '@shared/utils/path';
 import { useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowDown,
-  ArrowUp,
   ChevronDown,
-  CloudUpload,
   GitBranch,
   GripVertical,
   History,
-  Loader2,
   PanelLeft,
   PanelLeftClose,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { GitSyncButton } from '@/components/git/GitSyncButton';
 import {
   AlertDialog,
   AlertDialogClose,
@@ -32,14 +29,9 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty';
 import { toastManager } from '@/components/ui/toast';
-import {
-  useGitBranches,
-  useGitCheckout,
-  useGitPull,
-  useGitPush,
-  useGitStatus,
-} from '@/hooks/useGit';
+import { useGitBranches, useGitCheckout } from '@/hooks/useGit';
 import { useCommitDiff, useCommitFiles, useGitHistoryInfinite } from '@/hooks/useGitHistory';
+import { useGitSync } from '@/hooks/useGitSync';
 import { useFileChanges, useGitFetch } from '@/hooks/useSourceControl';
 import { useSubmoduleFileDiff, useSubmodules } from '@/hooks/useSubmodules';
 import { useI18n } from '@/i18n';
@@ -112,12 +104,22 @@ export function SourceControlPanel({
   const changes = fileChangesResult?.changes;
   const skippedDirs = fileChangesResult?.skippedDirs;
 
-  // Git sync status
-  const { data: gitStatus, refetch: refetchStatus } = useGitStatus(rootPath ?? null, isActive);
-  const pushMutation = useGitPush();
-  const pullMutation = useGitPull();
+  // Git sync operations using shared hook
+  const {
+    gitStatus,
+    refetchStatus,
+    isSyncing,
+    ahead,
+    behind,
+    tracking,
+    currentBranch,
+    handleSync: baseHandleSync,
+    handlePublish: baseHandlePublish,
+  } = useGitSync({ workdir: rootPath ?? '', enabled: isActive && !!rootPath });
+
+  // Note: useGitFetch is separate from useGitSync because fetch is a read-only
+  // operation used for refresh, while sync handles push/pull mutations.
   const fetchMutation = useGitFetch();
-  const isSyncing = pushMutation.isPending || pullMutation.isPending;
 
   // Branch switching
   const {
@@ -131,7 +133,7 @@ export function SourceControlPanel({
   const { data: submodules = [] } = useSubmodules(rootPath ?? null);
 
   // Submodule file diff - fetch when a submodule file is selected
-  const { data: submoduleFileDiff, isLoading: submoduleDiffLoading } = useSubmoduleFileDiff(
+  const { data: submoduleFileDiff } = useSubmoduleFileDiff(
     rootPath ?? null,
     selectedSubmoduleFile?.submodulePath ?? null,
     selectedSubmoduleFile?.path ?? null,
@@ -159,82 +161,18 @@ export function SourceControlPanel({
     }
   }, [isActive, rootPath, refetch, refetchCommits, refetchStatus, queryClient]);
 
-  // Sync handler: pull first (if behind), then push (if ahead)
+  // Wrap sync handlers to add additional refetch calls for SourceControlPanel
   const handleSync = useCallback(async () => {
-    if (!rootPath || isSyncing) return;
+    await baseHandleSync();
+    refetch();
+    refetchCommits();
+  }, [baseHandleSync, refetch, refetchCommits]);
 
-    try {
-      let pulled = false;
-      let pushed = false;
-
-      // Pull first if behind
-      if (gitStatus?.behind && gitStatus.behind > 0) {
-        await pullMutation.mutateAsync({ workdir: rootPath });
-        pulled = true;
-      }
-      // Then push if ahead
-      if (gitStatus?.ahead && gitStatus.ahead > 0) {
-        await pushMutation.mutateAsync({ workdir: rootPath });
-        pushed = true;
-      }
-      // Refetch all data after sync
-      refetch();
-      refetchCommits();
-      refetchStatus();
-
-      // Show success toast
-      if (pulled || pushed) {
-        const actions = [pulled && t('Pulled'), pushed && t('Pushed')].filter(Boolean).join(' & ');
-        toastManager.add({
-          title: t('Sync completed'),
-          description: actions,
-          type: 'success',
-          timeout: 3000,
-        });
-      }
-    } catch {
-      // Errors are handled by mutation's onError
-    }
-  }, [
-    rootPath,
-    isSyncing,
-    gitStatus,
-    pullMutation,
-    pushMutation,
-    refetch,
-    refetchCommits,
-    refetchStatus,
-    t,
-  ]);
-
-  // Publish branch handler: push with --set-upstream
   const handlePublish = useCallback(async () => {
-    if (!rootPath || !gitStatus?.current || pushMutation.isPending) return;
-
-    try {
-      await pushMutation.mutateAsync({
-        workdir: rootPath,
-        remote: 'origin',
-        branch: gitStatus.current,
-        setUpstream: true,
-      });
-      // Refetch all data after publish
-      refetch();
-      refetchCommits();
-      refetchStatus();
-
-      toastManager.add({
-        title: t('Branch published'),
-        description: t('Branch {{branch}} is now tracking origin/{{branch}}', {
-          branch: gitStatus.current,
-        }),
-        type: 'success',
-        timeout: 3000,
-      });
-    } catch {
-      // Errors are handled by mutation's onError
-    }
-  }, [rootPath, gitStatus?.current, pushMutation, refetch, refetchCommits, refetchStatus, t]);
+    await baseHandlePublish();
+    refetch();
+    refetchCommits();
+  }, [baseHandlePublish, refetch, refetchCommits]);
 
   // Branch checkout handler
   const handleBranchCheckout = useCallback(
@@ -629,61 +567,17 @@ export function SourceControlPanel({
                     <span className="text-sm font-medium">{t('History')}</span>
                   </button>
 
-                  {/* Publish Branch Button - when no upstream */}
-                  {!gitStatus?.tracking && gitStatus?.current && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePublish();
-                      }}
-                      disabled={pushMutation.isPending}
-                      className="mr-2 flex h-6 items-center gap-1 rounded px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
-                      title={t('Publish branch to remote')}
-                    >
-                      {pushMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          <CloudUpload className="h-3 w-3" />
-                          <span>{t('Publish')}</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Sync Button - when has upstream and ahead/behind */}
-                  {gitStatus?.tracking && (gitStatus.ahead > 0 || gitStatus.behind > 0) && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSync();
-                      }}
-                      disabled={isSyncing}
-                      className="mr-2 flex h-6 items-center gap-1 rounded px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
-                      title={t('Sync with remote')}
-                    >
-                      {isSyncing ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <>
-                          {gitStatus.ahead > 0 && (
-                            <span className="flex items-center gap-0.5 text-blue-500">
-                              <ArrowUp className="h-3 w-3" />
-                              {gitStatus.ahead}
-                            </span>
-                          )}
-                          {gitStatus.behind > 0 && (
-                            <span className="flex items-center gap-0.5 text-orange-500">
-                              <ArrowDown className="h-3 w-3" />
-                              {gitStatus.behind}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </button>
-                  )}
+                  {/* Git Sync Button */}
+                  <GitSyncButton
+                    ahead={ahead}
+                    behind={behind}
+                    tracking={tracking}
+                    currentBranch={currentBranch}
+                    isSyncing={isSyncing}
+                    onSync={handleSync}
+                    onPublish={handlePublish}
+                    className="mr-2"
+                  />
                 </div>
 
                 {/* Collapsible content with AnimatePresence for proper unmounting */}
