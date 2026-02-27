@@ -118,8 +118,10 @@ export function useFileTree({ rootPath, enabled = true, isActive = true }: UseFi
     if (childrenRestoredRef.current) return;
     childrenRestoredRef.current = true;
 
-    // Use the already-loaded ref instead of re-reading localStorage
-    const restored = expandedPathsRef.current;
+    // Read directly from localStorage to avoid stale ref when this effect fires
+    // in the same flush as the rootPath effect (expandedPathsRef may still hold
+    // the previous rootPath's paths before setExpandedPaths state update is applied)
+    const restored = loadFileTreeExpandedPaths(rootPath);
     if (restored.size === 0) return;
 
     // Sort shallow-first so parent nodes are populated before their children
