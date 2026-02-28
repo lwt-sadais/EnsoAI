@@ -159,7 +159,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   markFileSaved: (path) =>
     set((state) => ({
-      tabs: state.tabs.map((tab) => (tab.path === path ? { ...tab, isDirty: false } : tab)),
+      tabs: state.tabs.map((tab) =>
+        tab.path === path
+          ? { ...tab, isDirty: false, hasExternalChange: false, externalContent: undefined }
+          : tab
+      ),
     })),
 
   markExternalChange: (path, externalContent) =>

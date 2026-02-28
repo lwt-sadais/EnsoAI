@@ -171,8 +171,11 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     (editor: monaco.editor.IStandaloneCodeEditor, value: string) => {
       const position = editor.getPosition();
       isProgrammaticUpdateRef.current = true;
-      editor.setValue(value);
-      isProgrammaticUpdateRef.current = false;
+      try {
+        editor.setValue(value);
+      } finally {
+        isProgrammaticUpdateRef.current = false;
+      }
       if (position) {
         editor.setPosition(position);
       }
@@ -290,8 +293,10 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         if (isBinary) return;
 
         if (changedTab.isDirty) {
-          // User has unsaved edits: avoid overwriting — mark as conflict for user to decide
-          if (latestContent !== changedTab.content) {
+          // User has unsaved edits: avoid overwriting — mark as conflict for user to decide.
+          // Compare against externalContent (not user's content) so consecutive external
+          // modifications always update externalContent to the latest value.
+          if (latestContent !== changedTab.externalContent) {
             markExternalChange(event.path, latestContent);
           }
         } else {
