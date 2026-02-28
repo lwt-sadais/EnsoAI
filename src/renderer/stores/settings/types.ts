@@ -321,6 +321,7 @@ export interface SettingsState {
   autoCreateSessionOnActivate: boolean; // Auto-create agent/terminal session when worktree becomes active
 
   // Beta features
+  todoEnabled: boolean; // Enable Todo kanban board (Beta)
   glowEffectEnabled: boolean; // Enable glow animation effect for AI output states (Beta)
   temporaryWorkspaceEnabled: boolean; // Enable Temp Session (Beta)
   defaultTemporaryPath: string; // Default path for temp sessions
@@ -438,6 +439,7 @@ export interface SettingsState {
   setAutoCreateSessionOnActivate: (enabled: boolean) => void;
 
   // Setters - Beta features
+  setTodoEnabled: (enabled: boolean) => void;
   setGlowEffectEnabled: (enabled: boolean) => void;
   setTemporaryWorkspaceEnabled: (enabled: boolean) => void;
   setDefaultTemporaryPath: (path: string) => void;

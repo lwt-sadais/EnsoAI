@@ -743,6 +743,7 @@ export const zhTranslations: Record<string, string> = {
   'Quick Terminal': '快捷终端',
   'Enable Quick Terminal': '启用快捷终端',
   'Show floating terminal button for quick access': '显示浮动终端按钮以便快速访问',
+  'Enable Todo kanban board tab': '启用待办看板标签页',
   'Hide Groups': '隐藏分组',
   'Hide group management panel and show all repositories': '隐藏分组管理面板，显示所有仓库',
   'Hide Repository': '隐藏仓库',

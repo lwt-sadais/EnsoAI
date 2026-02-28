@@ -149,6 +149,7 @@ function getInitialState() {
     autoCreateSessionOnActivate: false,
 
     // Beta features
+    todoEnabled: false,
     glowEffectEnabled: false,
     temporaryWorkspaceEnabled: false,
     defaultTemporaryPath: '',
@@ -466,6 +467,7 @@ export const useSettingsStore = create<SettingsState>()(
         set({ autoCreateSessionOnActivate }),
 
       // Beta Feature Setters
+      setTodoEnabled: (todoEnabled) => set({ todoEnabled }),
       setGlowEffectEnabled: (glowEffectEnabled) => set({ glowEffectEnabled }),
       setTemporaryWorkspaceEnabled: (temporaryWorkspaceEnabled) =>
         set({ temporaryWorkspaceEnabled }),

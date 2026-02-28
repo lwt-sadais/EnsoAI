@@ -305,6 +305,9 @@ export const defaultAgentSettings: AgentSettings = {
 // No default detection status - all agents need to be detected
 export const defaultAgentDetectionStatus: AgentDetectionStatus = {};
 
+// Default todo settings
+export const defaultTodoEnabled = false;
+
 // Default quick terminal settings
 export const defaultQuickTerminalSettings: QuickTerminalSettings = {
   enabled: true,
