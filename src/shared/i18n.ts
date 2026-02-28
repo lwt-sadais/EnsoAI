@@ -507,6 +507,9 @@ export const zhTranslations: Record<string, string> = {
   "Don't Save": '不保存',
   'Save failed': '保存失败',
   'File read failed': '读取文件失败',
+  'File changed externally': '文件已被外部修改',
+  'Keep Mine': '保留本地',
+  Reload: '重新加载',
   'Do you want to save the changes you made to {{file}}?': '要保存对 {{file}} 的更改吗？',
   "Your changes will be lost if you don't save them.": '如果不保存，你的更改将丢失。',
   'Set global main tab shortcuts (Cmd on macOS, Win on Windows)':

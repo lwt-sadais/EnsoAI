@@ -34,6 +34,7 @@ import { useSettingsStore } from '@/stores/settings';
 import { useTerminalWriteStore } from '@/stores/terminalWrite';
 import { CommentForm, useEditorLineComment } from './EditorLineComment';
 import { EditorTabs } from './EditorTabs';
+import { ExternalModificationBanner } from './ExternalModificationBanner';
 import { isImageFile, isPdfFile } from './fileIcons';
 import { ImagePreview } from './ImagePreview';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -149,6 +150,9 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   const previewRef = useRef<HTMLDivElement>(null);
   const isSyncingScrollRef = useRef(false); // Prevent scroll loop
   const setCurrentCursorLine = useEditorStore((state) => state.setCurrentCursorLine);
+  const markExternalChange = useEditorStore((state) => state.markExternalChange);
+  const applyExternalChange = useEditorStore((state) => state.applyExternalChange);
+  const dismissExternalChange = useEditorStore((state) => state.dismissExternalChange);
   const themeDefinedRef = useRef(false);
   const selectionDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectionWidgetRef = useRef<monaco.editor.IContentWidget | null>(null);
@@ -159,6 +163,25 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   const activeTabPathRef = useRef<string | null>(null);
   const pendingCursorRef = useRef<PendingCursor | null>(null);
   const editorForPathRef = useRef<string | null>(null);
+  // Flag to suppress onChange events triggered by programmatic setValue calls (not user input)
+  const isProgrammaticUpdateRef = useRef(false);
+
+  // Set editor value without triggering the onChange handler (not treated as user input)
+  const setEditorValueProgrammatically = useCallback(
+    (editor: monaco.editor.IStandaloneCodeEditor, value: string) => {
+      const position = editor.getPosition();
+      isProgrammaticUpdateRef.current = true;
+      try {
+        editor.setValue(value);
+      } finally {
+        isProgrammaticUpdateRef.current = false;
+      }
+      if (position) {
+        editor.setPosition(position);
+      }
+    },
+    []
+  );
 
   // Line comment feature
   useEditorLineComment({
@@ -269,16 +292,22 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         // Skip content update for binary files (they have no text content)
         if (isBinary) return;
 
-        onContentChange(event.path, latestContent, changedTab.isDirty);
+        if (changedTab.isDirty) {
+          // User has unsaved edits: avoid overwriting — mark as conflict for user to decide.
+          // Compare against externalContent (not user's content) so consecutive external
+          // modifications always update externalContent to the latest value.
+          if (latestContent !== changedTab.externalContent) {
+            markExternalChange(event.path, latestContent);
+          }
+        } else {
+          // No unsaved edits: silent auto-reload
+          onContentChange(event.path, latestContent, false);
 
-        if (event.path === activeTabPath && editorRef.current) {
-          const editor = editorRef.current;
-          const currentValue = editor.getValue();
-          if (currentValue !== latestContent) {
-            const position = editor.getPosition();
-            editor.setValue(latestContent);
-            if (position) {
-              editor.setPosition(position);
+          // Sync Monaco editor content if this is the active tab
+          if (event.path === activeTabPath && editorRef.current) {
+            const editor = editorRef.current;
+            if (editor.getValue() !== latestContent) {
+              setEditorValueProgrammatically(editor, latestContent);
             }
           }
         }
@@ -290,7 +319,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     return () => {
       unsubscribe();
     };
-  }, [tabs, activeTabPath, onContentChange]);
+  }, [tabs, activeTabPath, onContentChange, markExternalChange, setEditorValueProgrammatically]);
 
   // Define custom theme on mount and when terminal theme / background image settings change
   useEffect(() => {
@@ -684,6 +713,9 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
+      // Ignore onChange events fired by programmatic setValue (not actual user input)
+      if (isProgrammaticUpdateRef.current) return;
+
       if (activeTabPath && value !== undefined) {
         const autoSaveEnabled = editorSettings.autoSave !== 'off';
         // Show dirty indicator when auto save is off or when it triggers on focus/window change
@@ -934,6 +966,21 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             </BreadcrumbList>
           </Breadcrumb>
         </div>
+      )}
+
+      {/* External modification conflict banner */}
+      {activeTab?.hasExternalChange && (
+        <ExternalModificationBanner
+          onReload={() => {
+            const externalContent = activeTab.externalContent;
+            applyExternalChange(activeTab.path);
+            // Sync Monaco editor immediately after applying external content
+            if (editorRef.current && externalContent !== undefined) {
+              setEditorValueProgrammatically(editorRef.current, externalContent);
+            }
+          }}
+          onDismiss={() => dismissExternalChange(activeTab.path)}
+        />
       )}
 
       {/* Editor */}
