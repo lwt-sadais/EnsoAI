@@ -166,6 +166,20 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   // Flag to suppress onChange events triggered by programmatic setValue calls (not user input)
   const isProgrammaticUpdateRef = useRef(false);
 
+  // Set editor value without triggering the onChange handler (not treated as user input)
+  const setEditorValueProgrammatically = useCallback(
+    (editor: monaco.editor.IStandaloneCodeEditor, value: string) => {
+      const position = editor.getPosition();
+      isProgrammaticUpdateRef.current = true;
+      editor.setValue(value);
+      isProgrammaticUpdateRef.current = false;
+      if (position) {
+        editor.setPosition(position);
+      }
+    },
+    []
+  );
+
   // Line comment feature
   useEditorLineComment({
     editor: editorInstance,
@@ -288,14 +302,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
           if (event.path === activeTabPath && editorRef.current) {
             const editor = editorRef.current;
             if (editor.getValue() !== latestContent) {
-              const position = editor.getPosition();
-              // Suppress onChange so this programmatic setValue is not treated as user input
-              isProgrammaticUpdateRef.current = true;
-              editor.setValue(latestContent);
-              isProgrammaticUpdateRef.current = false;
-              if (position) {
-                editor.setPosition(position);
-              }
+              setEditorValueProgrammatically(editor, latestContent);
             }
           }
         }
@@ -307,7 +314,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     return () => {
       unsubscribe();
     };
-  }, [tabs, activeTabPath, onContentChange, markExternalChange]);
+  }, [tabs, activeTabPath, onContentChange, markExternalChange, setEditorValueProgrammatically]);
 
   // Define custom theme on mount and when terminal theme / background image settings change
   useEffect(() => {
@@ -964,14 +971,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             applyExternalChange(activeTab.path);
             // Sync Monaco editor immediately after applying external content
             if (editorRef.current && externalContent !== undefined) {
-              const position = editorRef.current.getPosition();
-              // Suppress onChange so this programmatic setValue is not treated as user input
-              isProgrammaticUpdateRef.current = true;
-              editorRef.current.setValue(externalContent);
-              isProgrammaticUpdateRef.current = false;
-              if (position) {
-                editorRef.current.setPosition(position);
-              }
+              setEditorValueProgrammatically(editorRef.current, externalContent);
             }
           }}
           onDismiss={() => dismissExternalChange(activeTab.path)}
