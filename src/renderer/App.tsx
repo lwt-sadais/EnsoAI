@@ -35,8 +35,8 @@ import {
   useWorktreeSync,
 } from './App/hooks';
 import {
-  getStoredBoolean,
   getRepositorySettings,
+  getStoredBoolean,
   getStoredWorktreeMap,
   STORAGE_KEYS,
   saveActiveGroupId,
@@ -284,7 +284,10 @@ export default function App() {
   useAppKeyboardShortcuts({
     activeWorktreePath: activeWorktree?.path,
     onTabSwitch: handleTabChange,
-    onActionPanelToggle: useCallback(() => setActionPanelOpen((prev) => !prev), []),
+    onActionPanelToggle: useCallback(
+      () => setActionPanelOpen((prev) => !prev),
+      [setActionPanelOpen]
+    ),
     onToggleWorktree: useCallback(() => {
       // In tree layout, toggle selected repo expanded; in columns layout, toggle worktree panel
       if (layoutMode === 'tree') {
@@ -292,8 +295,11 @@ export default function App() {
       } else {
         setWorktreeCollapsed((prev) => !prev);
       }
-    }, [layoutMode]),
-    onToggleRepository: useCallback(() => setRepositoryCollapsed((prev) => !prev), []),
+    }, [layoutMode, setWorktreeCollapsed, toggleSelectedRepoExpandedRef.current]),
+    onToggleRepository: useCallback(
+      () => setRepositoryCollapsed((prev) => !prev),
+      [setRepositoryCollapsed]
+    ),
     onSwitchActiveWorktree: useCallback(() => {
       const activities = useWorktreeActivityStore.getState().activities;
 
@@ -318,7 +324,7 @@ export default function App() {
       // 切换到下一个 worktree（使用 ref 调用跨仓库切换函数）
       const nextWorktreePath = activeWorktreePaths[nextIndex];
       switchWorktreePathRef.current?.(nextWorktreePath);
-    }, [activeWorktree?.path]),
+    }, [activeWorktree?.path, switchWorktreePathRef.current]),
   });
 
   // Web Inspector: listen for element inspection data and write to active agent terminal
@@ -326,7 +332,7 @@ export default function App() {
 
   useTerminalNavigation(activeWorktree?.path ?? null, setActiveTab, setWorktreeTabMap);
   useMenuActions(openSettings, setActionPanelOpen);
-  useAppLifecycle();
+  const { confirmCloseAndRespond } = useAppLifecycle(panelState.setCloseDialogOpen);
   useClaudeProviderListener(
     setSettingsCategory,
     setScrollToProvider,
@@ -455,7 +461,7 @@ export default function App() {
         setActiveWorktree(null);
       }
     },
-    [repositories, saveRepositories, selectedRepo]
+    [repositories, saveRepositories, selectedRepo, setActiveWorktree, setSelectedRepo]
   );
 
   useEffect(() => {
@@ -598,6 +604,7 @@ export default function App() {
       tempWorkspaces,
       t,
       effectiveTempBasePath,
+      setActiveWorktree,
     ]
   );
 
@@ -632,7 +639,17 @@ export default function App() {
         } catch {}
       }
     },
-    [tempWorkspaces, worktrees, repositories, worktreeTabMap, handleSelectWorktree, refreshGitData]
+    [
+      tempWorkspaces,
+      worktrees,
+      repositories,
+      worktreeTabMap,
+      handleSelectWorktree,
+      refreshGitData,
+      setActiveTab,
+      setActiveWorktree,
+      setSelectedRepo,
+    ]
   );
 
   // Assign to ref for use in keyboard shortcut callback
@@ -663,7 +680,13 @@ export default function App() {
       setActiveWorktree(null);
       setActiveTab('chat');
     },
-    [repositories, saveRepositories, setActiveWorktree, setActiveTab]
+    [
+      repositories,
+      saveRepositories,
+      setActiveWorktree,
+      setActiveTab, // Auto-select the new repo
+      setSelectedRepo,
+    ]
   );
 
   // Handle cloning a remote repository
@@ -692,7 +715,13 @@ export default function App() {
       setActiveWorktree(null);
       setActiveTab('chat');
     },
-    [repositories, saveRepositories, setActiveWorktree, setActiveTab]
+    [
+      repositories,
+      saveRepositories,
+      setActiveWorktree,
+      setActiveTab, // Auto-select the new repo
+      setSelectedRepo,
+    ]
   );
 
   const setPendingScript = useInitScriptStore((s) => s.setPendingScript);
@@ -901,7 +930,13 @@ export default function App() {
 
     window.dispatchEvent(new CustomEvent(eventName));
     setPendingProviderAction(null);
-  }, [settingsDisplayMode, settingsDialogOpen, activeTab, pendingProviderAction]);
+  }, [
+    settingsDisplayMode,
+    settingsDialogOpen,
+    activeTab,
+    pendingProviderAction,
+    setPendingProviderAction,
+  ]);
 
   useBackgroundImage();
 
@@ -1188,9 +1223,6 @@ export default function App() {
           open={closeDialogOpen}
           onOpenChange={(open) => {
             setCloseDialogOpen(open);
-            if (!open) {
-              window.electronAPI.app.confirmClose(false);
-            }
           }}
         >
           <DialogPopup className="sm:max-w-sm" showCloseButton={false}>
@@ -1203,7 +1235,6 @@ export default function App() {
                 variant="outline"
                 onClick={() => {
                   setCloseDialogOpen(false);
-                  window.electronAPI.app.confirmClose(false);
                 }}
               >
                 {t('Cancel')}
@@ -1212,7 +1243,7 @@ export default function App() {
                 variant="destructive"
                 onClick={() => {
                   setCloseDialogOpen(false);
-                  window.electronAPI.app.confirmClose(true);
+                  confirmCloseAndRespond();
                 }}
               >
                 {t('Exit')}
