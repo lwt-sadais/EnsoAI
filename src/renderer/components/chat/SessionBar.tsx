@@ -235,6 +235,39 @@ function getSessionDisplayName(session: {
   return title;
 }
 
+const MAX_TAB_TEXT_WIDTH = 120;
+
+/** Text that scrolls horizontally when overflowing */
+function MarqueeText({ children, className }: { children: string; className?: string }) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState(0);
+
+  const innerRefCb = useCallback((node: HTMLSpanElement | null) => {
+    if (!node || !outerRef.current) return;
+    setOverflow(Math.max(0, node.scrollWidth - outerRef.current.clientWidth));
+  }, []);
+
+  return (
+    <div
+      ref={outerRef}
+      className={cn('overflow-hidden whitespace-nowrap', className)}
+      style={{ maxWidth: MAX_TAB_TEXT_WIDTH }}
+    >
+      <span
+        ref={innerRefCb}
+        className={cn('inline-block', overflow > 0 && 'group-hover:animate-marquee')}
+        style={
+          overflow > 0
+            ? ({ '--marquee-offset': `-${overflow + 8}px` } as React.CSSProperties)
+            : undefined
+        }
+      >
+        {children}
+      </span>
+    </div>
+  );
+}
+
 function SessionTab({
   session,
   index,
@@ -312,7 +345,7 @@ function SessionTab({
               className="w-20 bg-transparent outline-none border-b border-current"
             />
           ) : (
-            <span>{getSessionDisplayName(session)}</span>
+            <MarqueeText>{getSessionDisplayName(session)}</MarqueeText>
           )}
           <button
             type="button"
@@ -390,7 +423,7 @@ function SessionTab({
             className="relative z-10 w-20 bg-transparent outline-none border-b border-current"
           />
         ) : (
-          <span className="relative z-10">{getSessionDisplayName(session)}</span>
+          <MarqueeText className="relative z-10">{getSessionDisplayName(session)}</MarqueeText>
         )}
         <button
           type="button"
@@ -808,7 +841,7 @@ export function SessionBar({
             <Sparkles className="h-4 w-4 text-muted-foreground" />
           </div>
         ) : (
-          <div className="flex items-center gap-1 rounded-full border bg-background/80 px-2 py-1.5 shadow-lg backdrop-blur-sm min-w-fit">
+          <div className="flex flex-nowrap items-center gap-1 rounded-full border bg-background/80 px-2 py-1.5 shadow-lg backdrop-blur-sm min-w-fit">
             <div
               className="flex h-7 w-4 items-center justify-center text-muted-foreground/50 cursor-grab"
               onMouseDown={handleMouseDown}

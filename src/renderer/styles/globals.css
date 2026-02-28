@@ -35,10 +35,20 @@
   --font-mono: var(--font-family-mono, "JetBrains Mono", "Menlo", monospace);
 
   --animate-skeleton: skeleton 2s -1s infinite linear;
+  --animate-marquee: marquee 4s linear infinite alternate;
 
   @keyframes skeleton {
     to {
       background-position: -200% 0;
+    }
+  }
+
+  @keyframes marquee {
+    0%, 20% {
+      transform: translateX(0);
+    }
+    80%, 100% {
+      transform: translateX(var(--marquee-offset, 0));
     }
   }
 }
