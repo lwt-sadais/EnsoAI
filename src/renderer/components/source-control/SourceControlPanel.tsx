@@ -33,6 +33,7 @@ import {
   useGitUnstage,
 } from '@/hooks/useSourceControl';
 import {
+  useCheckoutSubmoduleBranch,
   useStageSubmodule,
   useSubmoduleBranches,
   useSubmoduleChanges,
@@ -128,6 +129,7 @@ export function SourceControlPanel({
     refetch: refetchBranches,
   } = useGitBranches(rootPath ?? null);
   const checkoutMutation = useGitCheckout();
+  const checkoutSubmoduleMutation = useCheckoutSubmoduleBranch();
 
   // Submodules
   const { data: submodules = [] } = useSubmodules(rootPath ?? null);
@@ -397,17 +399,33 @@ export function SourceControlPanel({
     [rootPath, repositories, pushMutation, queryClient, refetchStatus, refetch, refetchCommits, t]
   );
 
-  // Branch checkout handler
+  // Branch checkout handler - handles both main repo and submodule branches
   const handleBranchCheckout = useCallback(
     async (repoPath: string, branch: string) => {
-      if (!repoPath || checkoutMutation.isPending) return;
+      const isPending = checkoutMutation.isPending || checkoutSubmoduleMutation.isPending;
+      if (!repoPath || isPending) return;
+
+      // Detect submodule by matching repoPath against the submodule list
+      const submodule = submodules.find((s) => rootPath && repoPath === joinPath(rootPath, s.path));
 
       try {
-        await checkoutMutation.mutateAsync({ workdir: repoPath, branch });
-        refetch();
-        refetchBranches();
-        refetchCommits();
-        refetchStatus();
+        if (submodule && rootPath) {
+          // Use dedicated submodule mutation so onSuccess invalidates
+          // ['git', 'submodules', rootPath] — the correct cache key
+          await checkoutSubmoduleMutation.mutateAsync({
+            workdir: rootPath,
+            submodulePath: submodule.path,
+            branch,
+          });
+          refetchSubmoduleChanges();
+          refetchSubmoduleCommits();
+        } else {
+          await checkoutMutation.mutateAsync({ workdir: repoPath, branch });
+          refetch();
+          refetchBranches();
+          refetchCommits();
+          refetchStatus();
+        }
 
         toastManager.add({
           title: t('Branch switched'),
@@ -424,7 +442,19 @@ export function SourceControlPanel({
         });
       }
     },
-    [checkoutMutation, refetch, refetchBranches, refetchCommits, refetchStatus, t]
+    [
+      checkoutMutation,
+      checkoutSubmoduleMutation,
+      submodules,
+      rootPath,
+      refetch,
+      refetchBranches,
+      refetchCommits,
+      refetchStatus,
+      refetchSubmoduleChanges,
+      refetchSubmoduleCommits,
+      t,
+    ]
   );
 
   // Flatten infinite query data
@@ -810,7 +840,7 @@ export function SourceControlPanel({
                 onSync={handleSync}
                 onPublish={handlePublish}
                 onCheckout={handleBranchCheckout}
-                isCheckingOut={checkoutMutation.isPending}
+                isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
               />
 
               {/* Changes Section (Collapsible) */}
@@ -849,7 +879,9 @@ export function SourceControlPanel({
                       selectedRepoPath && handleBranchCheckout(selectedRepoPath, branch)
                     }
                     isLoading={currentBranchesLoading}
-                    isCheckingOut={checkoutMutation.isPending}
+                    isCheckingOut={
+                      checkoutMutation.isPending || checkoutSubmoduleMutation.isPending
+                    }
                     size="xs"
                   />
                 </div>

@@ -436,10 +436,21 @@ export class GitService {
   }
 
   async checkout(branch: string): Promise<void> {
-    // Remote branch names are in the format "remotes/origin/branch-name"
-    // git checkout requires "origin/branch-name" format to properly track remote branches
-    const normalizedBranch = branch.startsWith('remotes/') ? branch.slice(8) : branch;
-    await this.git.checkout(normalizedBranch);
+    if (branch.startsWith('remotes/')) {
+      // "remotes/origin/dev" → remoteBranch="origin/dev", localBranch="dev"
+      const remoteBranch = branch.slice(8);
+      const slashIdx = remoteBranch.indexOf('/');
+      const localBranch = slashIdx >= 0 ? remoteBranch.slice(slashIdx + 1) : remoteBranch;
+      try {
+        // Prefer switching to existing local branch
+        await this.git.checkout(localBranch);
+      } catch {
+        // Local branch does not exist: create it and track the remote
+        await this.git.checkout(['-b', localBranch, '--track', remoteBranch]);
+      }
+    } else {
+      await this.git.checkout(branch);
+    }
   }
 
   async createBranch(name: string, startPoint?: string): Promise<void> {
@@ -1333,11 +1344,25 @@ export class GitService {
   }
 
   /**
-   * 切换子模块分支
+   * Checkout a branch in a submodule.
+   * Handles remote tracking refs (remotes/origin/dev) by extracting the local
+   * branch name and creating a tracking branch when it does not exist locally.
    */
   async checkoutSubmoduleBranch(submodulePath: string, branch: string): Promise<void> {
     const subGit = this.getSubmoduleGit(submodulePath);
-    await subGit.checkout(branch);
+    if (branch.startsWith('remotes/')) {
+      // "remotes/origin/dev" → remoteBranch="origin/dev", localBranch="dev"
+      const remoteBranch = branch.slice(8);
+      const slashIdx = remoteBranch.indexOf('/');
+      const localBranch = slashIdx >= 0 ? remoteBranch.slice(slashIdx + 1) : remoteBranch;
+      try {
+        await subGit.checkout(localBranch);
+      } catch {
+        await subGit.checkout(['-b', localBranch, '--track', remoteBranch]);
+      }
+    } else {
+      await subGit.checkout(branch);
+    }
   }
 
   // Static methods for clone operations
