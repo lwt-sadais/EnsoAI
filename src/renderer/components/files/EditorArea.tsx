@@ -133,16 +133,26 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   const write = useTerminalWriteStore((state) => state.write);
   const focus = useTerminalWriteStore((state) => state.focus);
 
+  // Helper function to convert absolute path to relative path
+  const getRelativePath = useCallback(
+    (absolutePath: string): string => {
+      if (!rootPath) return absolutePath;
+      const normalizedRoot = normalizePath(rootPath);
+      const normalizedPath = normalizePath(absolutePath);
+      if (normalizedPath.startsWith(`${normalizedRoot}/`)) {
+        // Return original case path (not normalized) for display
+        return absolutePath.slice(rootPath.length + 1);
+      }
+      return absolutePath;
+    },
+    [rootPath]
+  );
+
   // Send file path to current session (for tab context menu)
   const handleSendToSession = useCallback(
     (path: string) => {
       if (!sessionId) return;
-      // Convert to relative path if within rootPath, otherwise use full path
-      let displayPath = path;
-      const normalizedRoot = rootPath ? normalizePath(rootPath) : '';
-      if (normalizedRoot && path.startsWith(`${normalizedRoot}/`)) {
-        displayPath = path.slice(normalizedRoot.length + 1);
-      }
+      const displayPath = getRelativePath(path);
       write(sessionId, `@${displayPath} `);
       focus(sessionId);
       addToast({
@@ -152,7 +162,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         timeout: 2000,
       });
     },
-    [sessionId, rootPath, write, focus, t]
+    [sessionId, getRelativePath, write, focus, t]
   );
 
   // Markdown preview state
@@ -426,7 +436,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             if (!selection || selection.isEmpty() || !activeTabPath) return;
 
             // Convert to relative path
-            const displayPath = rootPath ? normalizePath(activeTabPath, rootPath) : activeTabPath;
+            const displayPath = getRelativePath(activeTabPath);
 
             // Format line reference
             const endLine =
@@ -512,7 +522,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       onGlobalSearch,
       onClearPendingCursor,
       sessionId,
-      rootPath,
+      getRelativePath,
       t,
     ]
   );
@@ -575,10 +585,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       }
 
       // Convert to relative path
-      let displayPath = activeTabPath;
-      if (rootPath && activeTabPath.startsWith(rootPath)) {
-        displayPath = activeTabPath.slice(rootPath.length).replace(/^\//, '');
-      }
+      const displayPath = getRelativePath(activeTabPath);
 
       // Create comment widget
       const commentWidget: monaco.editor.IContentWidget = {
@@ -779,7 +786,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     editorReady,
     sessionId,
     activeTabPath,
-    rootPath,
+    getRelativePath,
     t,
     setCurrentCursorLine,
     write,
