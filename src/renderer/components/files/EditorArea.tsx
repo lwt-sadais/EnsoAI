@@ -133,6 +133,15 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
   const write = useTerminalWriteStore((state) => state.write);
   const focus = useTerminalWriteStore((state) => state.focus);
 
+  // Helper function to format line reference from selection
+  const formatLineRef = useCallback((selection: monaco.ISelection): string => {
+    const endLine =
+      selection.endColumn === 1 ? selection.endLineNumber - 1 : selection.endLineNumber;
+    return selection.startLineNumber === endLine
+      ? `L${selection.startLineNumber}`
+      : `L${selection.startLineNumber}-L${endLine}`;
+  }, []);
+
   // Helper function to convert absolute path to relative path
   const getRelativePath = useCallback(
     (absolutePath: string): string => {
@@ -439,12 +448,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             const displayPath = getRelativePath(activeTabPath);
 
             // Format line reference
-            const endLine =
-              selection.endColumn === 1 ? selection.endLineNumber - 1 : selection.endLineNumber;
-            const lineRef =
-              selection.startLineNumber === endLine
-                ? `L${selection.startLineNumber}`
-                : `L${selection.startLineNumber}-L${endLine}`;
+            const lineRef = formatLineRef(selection);
 
             // Send to terminal with @ prefix and line reference
             const message = `@${displayPath}#${lineRef} `;
@@ -523,6 +527,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       onClearPendingCursor,
       sessionId,
       getRelativePath,
+      formatLineRef,
       t,
     ]
   );
@@ -622,12 +627,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             }
 
             // Format: path#L1-L10 or path#L5
-            const endLine =
-              selection.endColumn === 1 ? selection.endLineNumber - 1 : selection.endLineNumber;
-            const lineRef =
-              selection.startLineNumber === endLine
-                ? `L${selection.startLineNumber}`
-                : `L${selection.startLineNumber}-L${endLine}`;
+            const lineRef = formatLineRef(selection);
             const message = text
               ? `${displayPath}#${lineRef}\nUser comment: "${text}"`
               : `${displayPath}#${lineRef}`;
@@ -787,6 +787,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     sessionId,
     activeTabPath,
     getRelativePath,
+    formatLineRef,
     t,
     setCurrentCursorLine,
     write,
