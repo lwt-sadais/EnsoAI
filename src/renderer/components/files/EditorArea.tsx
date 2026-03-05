@@ -447,13 +447,14 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
           precondition: 'editorHasSelection',
           run: (ed) => {
             const selection = ed.getSelection();
-            if (!selection || selection.isEmpty() || !activeTabPath) return;
+            const currentPath = activeTabPathRef.current;
+            if (!selection || selection.isEmpty() || !currentPath) return;
 
             const currentSessionId = sessionIdRef.current;
             if (!currentSessionId) return;
 
             // Convert to relative path
-            const displayPath = getRelativePath(activeTabPath);
+            const displayPath = getRelativePath(currentPath);
 
             // Format line reference
             const lineRef = formatLineRef(selection);
@@ -589,7 +590,8 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
 
     const showCommentForm = () => {
       const selection = editor.getSelection();
-      if (!selection || selection.isEmpty() || !activeTabPath) return;
+      const currentPath = activeTabPathRef.current;
+      if (!selection || selection.isEmpty() || !currentPath) return;
 
       // Hide button widget
       if (selectionWidgetRef.current) {
@@ -598,7 +600,7 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
       }
 
       // Convert to relative path
-      const displayPath = getRelativePath(activeTabPath);
+      const displayPath = getRelativePath(currentPath);
 
       // Create comment widget
       const commentWidget: monaco.editor.IContentWidget = {
