@@ -1,4 +1,5 @@
 import type { GitBranch as GitBranchType, GitWorktree, WorktreeCreateOptions } from '@shared/types';
+import { getPathBasename, isWslUncPath } from '@shared/utils/path';
 import { LayoutGroup, motion } from 'framer-motion';
 import {
   Copy,
@@ -109,7 +110,7 @@ export function WorktreePanel({
 
       // Create styled drag image
       const dragImage = document.createElement('div');
-      dragImage.textContent = worktree.branch || worktree.path.split(/[\\/]/).pop() || '';
+      dragImage.textContent = worktree.branch || getPathBasename(worktree.path);
       dragImage.style.cssText = `
         position: fixed;
         top: -9999px;
@@ -497,6 +498,7 @@ function WorktreeItem({
     worktree.isMainWorktree || worktree.branch === 'main' || worktree.branch === 'master';
   const branchDisplay = worktree.branch || t('Detached');
   const isPrunable = worktree.prunable;
+  const useLtrPathDisplay = isWslUncPath(worktree.path);
   const glowEnabled = useGlowEffectEnabled();
 
   // Git sync operations
@@ -657,7 +659,8 @@ function WorktreeItem({
         {/* Path - use rtl direction to show ellipsis at start, keeping end visible */}
         <div
           className={cn(
-            'relative z-10 w-full overflow-hidden whitespace-nowrap text-ellipsis pl-6 text-xs [direction:rtl] [text-align:left] [unicode-bidi:plaintext]',
+            'relative z-10 w-full overflow-hidden whitespace-nowrap text-ellipsis pl-6 text-xs [text-align:left] [unicode-bidi:plaintext]',
+            useLtrPathDisplay ? '[direction:ltr]' : '[direction:rtl]',
             isPrunable && 'line-through',
             isActive ? 'text-accent-foreground/70' : 'text-muted-foreground'
           )}

@@ -140,6 +140,8 @@ export function createMainWindow(): BrowserWindow {
 
   // Confirm before close (skip in dev mode)
   let forceClose = false;
+  let closeFlowInProgress = false;
+  const CLOSE_SAVE_IPC_TIMEOUT_MS = 30000;
 
   // Listen for close confirmation from renderer
   ipcMain.on(IPC_CHANNELS.APP_CLOSE_CONFIRM, (event, confirmed: boolean) => {
@@ -158,21 +160,44 @@ export function createMainWindow(): BrowserWindow {
       return;
     }
 
+    if (closeFlowInProgress) {
+      e.preventDefault();
+      return;
+    }
+
     e.preventDefault();
+    closeFlowInProgress = true;
 
     const requestId = randomUUID();
 
-    const waitFor = <T>(
+    const waitForNoTimeout = <T>(
       channel: string,
       predicate: (event: Electron.IpcMainEvent, ...args: any[]) => T | null
     ) =>
+      new Promise<T>((resolve) => {
+        const handler = (event: Electron.IpcMainEvent, ...args: any[]) => {
+          const match = predicate(event, ...args);
+          if (match === null) return;
+          ipcMain.removeListener(channel, handler);
+          resolve(match);
+        };
+
+        ipcMain.on(channel, handler);
+      });
+
+    const waitForWithTimeout = <T>(
+      channel: string,
+      predicate: (event: Electron.IpcMainEvent, ...args: any[]) => T | null,
+      timeoutMs: number
+    ) =>
       new Promise<T | null>((resolve) => {
+        let handler: (event: Electron.IpcMainEvent, ...args: any[]) => void;
         const timeout = setTimeout(() => {
           ipcMain.removeListener(channel, handler);
           resolve(null);
-        }, 60_000);
+        }, timeoutMs);
 
-        const handler = (event: Electron.IpcMainEvent, ...args: any[]) => {
+        handler = (event: Electron.IpcMainEvent, ...args: any[]) => {
           const match = predicate(event, ...args);
           if (match === null) return;
           clearTimeout(timeout);
@@ -184,30 +209,22 @@ export function createMainWindow(): BrowserWindow {
       });
 
     const runCloseFlow = async () => {
+      if (win.isDestroyed() || win.webContents.isDestroyed()) {
+        return;
+      }
+
       win.webContents.send(IPC_CHANNELS.APP_CLOSE_REQUEST, requestId);
 
-      const response = await waitFor<{ dirtyPaths: string[] }>(
+      const response = await waitForNoTimeout<{ confirmed: boolean; dirtyPaths: string[] }>(
         IPC_CHANNELS.APP_CLOSE_RESPONSE,
-        (event, respRequestId: string, payload: { dirtyPaths: string[] }) => {
+        (event, respRequestId: string, payload: { confirmed: boolean; dirtyPaths: string[] }) => {
           if (event.sender !== win.webContents) return null;
           if (respRequestId !== requestId) return null;
           return payload;
         }
       );
 
-      // If renderer doesn't respond, fall back to a simple confirm dialog to avoid blocking close.
-      if (!response) {
-        const { response: buttonIndex } = await dialog.showMessageBox(win, {
-          type: 'question',
-          buttons: ['Exit', 'Cancel'],
-          defaultId: 1,
-          cancelId: 1,
-          message: 'Are you sure you want to exit the app?',
-        });
-        if (buttonIndex !== 0) return;
-        forceClose = true;
-        win.hide();
-        win.close();
+      if (!response.confirmed) {
         return;
       }
 
@@ -238,13 +255,14 @@ export function createMainWindow(): BrowserWindow {
           const saveRequestId = `${requestId}:${filePath}`;
           win.webContents.send(IPC_CHANNELS.APP_CLOSE_SAVE_REQUEST, saveRequestId, filePath);
 
-          const saveResult = await waitFor<{ ok: boolean; error?: string }>(
+          const saveResult = await waitForWithTimeout<{ ok: boolean; error?: string }>(
             IPC_CHANNELS.APP_CLOSE_SAVE_RESPONSE,
             (event, respSaveRequestId: string, payload: { ok: boolean; error?: string }) => {
               if (event.sender !== win.webContents) return null;
               if (respSaveRequestId !== saveRequestId) return null;
               return payload;
-            }
+            },
+            CLOSE_SAVE_IPC_TIMEOUT_MS
           );
 
           if (!saveResult?.ok) {
@@ -265,7 +283,9 @@ export function createMainWindow(): BrowserWindow {
       win.close();
     };
 
-    void runCloseFlow();
+    void runCloseFlow().finally(() => {
+      closeFlowInProgress = false;
+    });
   });
 
   // Open external links in browser

@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
 import type { AIProvider, ModelId, ReasoningEffort } from '@shared/types';
+import { isWslGitRepository, spawnGit } from '../git/runtime';
 import { parseCLIOutput, spawnCLI } from './providers';
 
 export interface CommitMessageOptions {
@@ -35,12 +36,53 @@ function stripCodeFence(text: string): string {
     .trim();
 }
 
-function runGit(cmd: string, cwd: string): string {
-  try {
-    return execSync(cmd, { cwd, encoding: 'utf-8', timeout: 5000 }).trim();
-  } catch {
-    return '';
+function runGit(args: string[], cwd: string): Promise<string> {
+  if (!isWslGitRepository(cwd)) {
+    try {
+      return Promise.resolve(
+        execSync(`git ${args.join(' ')}`, { cwd, encoding: 'utf-8', timeout: 5000 }).trim()
+      );
+    } catch {
+      return Promise.resolve('');
+    }
   }
+
+  return new Promise((resolve) => {
+    let stdout = '';
+    let settled = false;
+
+    const proc = spawnGit(cwd, args);
+
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      if (!proc.killed) {
+        proc.kill('SIGKILL');
+      }
+      resolve('');
+    }, 5000);
+
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString('utf-8');
+    });
+
+    // Drain stderr to avoid child process blocking on full pipe buffer.
+    proc.stderr.on('data', () => {});
+
+    proc.on('error', () => {
+      clearTimeout(timeout);
+      if (settled) return;
+      settled = true;
+      resolve('');
+    });
+
+    proc.on('close', (code) => {
+      clearTimeout(timeout);
+      if (settled) return;
+      settled = true;
+      resolve(code === 0 ? stdout.trim() : '');
+    });
+  });
 }
 
 export async function generateCommitMessage(
@@ -56,9 +98,11 @@ export async function generateCommitMessage(
     prompt: customPrompt,
   } = options;
 
-  const recentCommits = runGit('git --no-pager log -5 --format="%s"', workdir);
-  const stagedStat = runGit('git --no-pager diff --cached --stat', workdir);
-  const stagedDiff = runGit('git --no-pager diff --cached', workdir);
+  const [recentCommits, stagedStat, stagedDiff] = await Promise.all([
+    runGit(['--no-pager', 'log', '-5', '--format=%s'], workdir),
+    runGit(['--no-pager', 'diff', '--cached', '--stat'], workdir),
+    runGit(['--no-pager', 'diff', '--cached'], workdir),
+  ]);
 
   const truncatedDiff =
     stagedDiff.split('\n').slice(0, maxDiffLines).join('\n') || '(no staged changes detected)';

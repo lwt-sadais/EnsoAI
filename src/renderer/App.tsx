@@ -4,6 +4,7 @@ import type {
   WorktreeMergeOptions,
   WorktreeMergeResult,
 } from '@shared/types';
+import { getPathBasename } from '@shared/utils/path';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -332,7 +333,9 @@ export default function App() {
 
   useTerminalNavigation(activeWorktree?.path ?? null, setActiveTab, setWorktreeTabMap);
   useMenuActions(openSettings, setActionPanelOpen);
-  const { confirmCloseAndRespond } = useAppLifecycle(panelState.setCloseDialogOpen);
+  const { confirmCloseAndRespond, cancelCloseAndRespond } = useAppLifecycle(
+    panelState.setCloseDialogOpen
+  );
   useClaudeProviderListener(
     setSettingsCategory,
     setScrollToProvider,
@@ -664,7 +667,7 @@ export default function App() {
       }
 
       // Extract repo name from path (handle both / and \ for Windows compatibility)
-      const name = selectedPath.split(/[\\/]/).pop() || selectedPath;
+      const name = getPathBasename(selectedPath);
 
       const newRepo: Repository = {
         name,
@@ -699,7 +702,7 @@ export default function App() {
       }
 
       // Extract repo name from path
-      const name = clonedPath.split(/[\\/]/).pop() || clonedPath;
+      const name = getPathBasename(clonedPath);
 
       const newRepo: Repository = {
         name,
@@ -1095,7 +1098,7 @@ export default function App() {
                       worktrees={sortedWorktrees}
                       activeWorktree={activeWorktree}
                       branches={branches}
-                      projectName={selectedRepo?.split(/[\\/]/).pop() || ''}
+                      projectName={selectedRepo ? getPathBasename(selectedRepo) : ''}
                       isLoading={worktreesLoading}
                       isCreating={createWorktreeMutation.isPending}
                       error={worktreeError}
@@ -1223,6 +1226,9 @@ export default function App() {
           open={closeDialogOpen}
           onOpenChange={(open) => {
             setCloseDialogOpen(open);
+            if (!open) {
+              cancelCloseAndRespond();
+            }
           }}
         >
           <DialogPopup className="sm:max-w-sm" showCloseButton={false}>
@@ -1235,6 +1241,7 @@ export default function App() {
                 variant="outline"
                 onClick={() => {
                   setCloseDialogOpen(false);
+                  cancelCloseAndRespond();
                 }}
               >
                 {t('Cancel')}

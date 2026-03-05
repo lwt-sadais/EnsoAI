@@ -2,8 +2,13 @@ import { stopAllCodeReviews } from '../services/ai';
 import { disposeClaudeIdeBridge } from '../services/claude/ClaudeIdeBridge';
 import { autoUpdaterService } from '../services/updater/AutoUpdater';
 import { webInspectorServer } from '../services/webInspector';
+import { cleanupExecInPtys, cleanupExecInPtysSync } from '../utils/shell';
 import { registerAgentHandlers } from './agent';
 import { registerAppHandlers } from './app';
+import {
+  registerClaudeCompletionsHandlers,
+  stopClaudeCompletionsWatchers,
+} from './claudeCompletions';
 import { registerClaudeConfigHandlers } from './claudeConfig';
 import { registerClaudeProviderHandlers } from './claudeProvider';
 import { registerCliHandlers } from './cli';
@@ -16,12 +21,7 @@ import {
   stopAllFileWatchersSync,
 } from './files';
 import { clearAllGitServices, registerGitHandlers } from './git';
-import {
-  autoStartHapi,
-  cleanupHapi,
-  cleanupHapiSync,
-  registerHapiHandlers,
-} from './hapi';
+import { autoStartHapi, cleanupHapi, cleanupHapiSync, registerHapiHandlers } from './hapi';
 
 export { autoStartHapi };
 
@@ -36,7 +36,7 @@ import {
   destroyAllTerminalsAndWait,
   registerTerminalHandlers,
 } from './terminal';
-import { cleanupTmux, cleanupTmuxSync, registerTmuxHandlers } from './tmux';
+import { cleanupTmuxSync, registerTmuxHandlers } from './tmux';
 import { cleanupTodo, registerTodoHandlers } from './todo';
 import { registerUpdaterHandlers } from './updater';
 import { registerWebInspectorHandlers } from './webInspector';
@@ -60,6 +60,7 @@ export function registerIpcHandlers(): void {
   registerHapiHandlers();
   registerClaudeProviderHandlers();
   registerClaudeConfigHandlers();
+  registerClaudeCompletionsHandlers();
   registerWebInspectorHandlers();
   registerTempWorkspaceHandlers();
   registerTmuxHandlers();
@@ -69,11 +70,19 @@ export function registerIpcHandlers(): void {
 export async function cleanupAllResources(): Promise<void> {
   const CLEANUP_TIMEOUT = 3000;
 
+  // Ensure any in-flight execInPty commands are terminated before Node shutdown.
+  // Leaving node-pty PTYs alive can deadlock native addon cleanup on macOS.
+  await cleanupExecInPtys(CLEANUP_TIMEOUT);
+
   // Stop Hapi server first (graceful best-effort with timeout)
   await cleanupHapi(CLEANUP_TIMEOUT);
 
-  // Kill tmux enso server (async, fast)
-  cleanupTmux().catch((err) => console.warn('Tmux cleanup warning:', err));
+  // Kill tmux enso server (sync, best-effort). Avoid spawning new PTYs during shutdown.
+  try {
+    cleanupTmuxSync();
+  } catch (err) {
+    console.warn('Tmux cleanup warning:', err);
+  }
 
   // Stop Web Inspector server (sync, fast)
   webInspectorServer.stop();
@@ -108,6 +117,21 @@ export async function cleanupAllResources(): Promise<void> {
     console.warn('File watcher cleanup warning:', err);
   }
 
+  // Stop Claude completions watcher (best-effort)
+  try {
+    await Promise.race([
+      stopClaudeCompletionsWatchers(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Claude completions watcher cleanup timeout')),
+          CLEANUP_TIMEOUT
+        )
+      ),
+    ]);
+  } catch (err) {
+    console.warn('Claude completions watcher cleanup warning:', err);
+  }
+
   // Clear service caches (sync, fast)
   clearAllGitServices();
   clearAllWorktreeServices();
@@ -131,6 +155,9 @@ export async function cleanupAllResources(): Promise<void> {
  */
 export function cleanupAllResourcesSync(): void {
   console.log('[app] Sync cleanup starting...');
+
+  // Kill any in-flight execInPty commands first (sync)
+  cleanupExecInPtysSync();
 
   // Kill Hapi/Cloudflared processes (sync)
   cleanupHapiSync();
