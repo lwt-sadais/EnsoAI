@@ -426,16 +426,15 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             if (!selection || selection.isEmpty() || !activeTabPath) return;
 
             // Convert to relative path
-            let displayPath = activeTabPath;
-            if (rootPath && activeTabPath.startsWith(rootPath)) {
-              displayPath = activeTabPath.slice(rootPath.length).replace(/^\//, '');
-            }
+            const displayPath = rootPath ? normalizePath(activeTabPath, rootPath) : activeTabPath;
 
             // Format line reference
+            const endLine =
+              selection.endColumn === 1 ? selection.endLineNumber - 1 : selection.endLineNumber;
             const lineRef =
-              selection.startLineNumber === selection.endLineNumber
+              selection.startLineNumber === endLine
                 ? `L${selection.startLineNumber}`
-                : `L${selection.startLineNumber}-L${selection.endLineNumber}`;
+                : `L${selection.startLineNumber}-L${endLine}`;
 
             // Send to terminal with @ prefix and line reference
             const message = `@${displayPath}#${lineRef} `;
@@ -616,10 +615,12 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
             }
 
             // Format: path#L1-L10 or path#L5
+            const endLine =
+              selection.endColumn === 1 ? selection.endLineNumber - 1 : selection.endLineNumber;
             const lineRef =
-              selection.startLineNumber === selection.endLineNumber
+              selection.startLineNumber === endLine
                 ? `L${selection.startLineNumber}`
-                : `L${selection.startLineNumber}-L${selection.endLineNumber}`;
+                : `L${selection.startLineNumber}-L${endLine}`;
             const message = text
               ? `${displayPath}#${lineRef}\nUser comment: "${text}"`
               : `${displayPath}#${lineRef}`;
