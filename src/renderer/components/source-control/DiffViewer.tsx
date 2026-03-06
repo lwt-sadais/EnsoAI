@@ -146,7 +146,11 @@ export function DiffViewer({
   // In commit view, we don't fetch diff - we use the provided externalDiff
   const shouldFetch = !skipFetch && !isCommitView;
 
-  const { data: fetchedDiff, isLoading } = useFileDiff(
+  const {
+    data: fetchedDiff,
+    isLoading,
+    refetch,
+  } = useFileDiff(
     rootPath,
     file?.path ?? null,
     file?.staged ?? false,
@@ -990,6 +994,10 @@ export function DiffViewer({
     hasAutoNavigatedRef.current = false;
     setIsEditing(false);
     setEditedContent(null);
+    // Force refetch diff data when file changes
+    if (file && shouldFetch) {
+      refetch();
+    }
   }, [file?.path, file?.staged]);
 
   if (!file) {
