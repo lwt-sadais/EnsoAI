@@ -327,32 +327,24 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
 
   // Listen for external file changes and update open tabs
   useEffect(() => {
-    const unsubscribe = window.electronAPI.file.onChange(async (event) => {
-      // Only handle update events (create/delete don't need tab updates)
-      if (event.type !== 'update') return;
-
-      // Check if the changed file is open in any tab
-      const changedTab = tabs.find((tab) => tab.path === event.path);
-      if (!changedTab) return;
-
+    const reloadTab = async (tab: EditorTab) => {
       try {
-        const { content: latestContent, isBinary } = await window.electronAPI.file.read(event.path);
-        // Skip content update for binary files (they have no text content)
+        const { content: latestContent, isBinary } = await window.electronAPI.file.read(tab.path);
         if (isBinary) return;
 
-        if (changedTab.isDirty) {
+        if (tab.isDirty) {
           // User has unsaved edits: avoid overwriting — mark as conflict for user to decide.
           // Compare against externalContent (not user's content) so consecutive external
           // modifications always update externalContent to the latest value.
-          if (latestContent !== changedTab.externalContent) {
-            markExternalChange(event.path, latestContent);
+          if (latestContent !== tab.externalContent) {
+            markExternalChange(tab.path, latestContent);
           }
         } else {
           // No unsaved edits: silent auto-reload
-          onContentChange(event.path, latestContent, false);
+          onContentChange(tab.path, latestContent, false);
 
           // Sync Monaco editor content if this is the active tab
-          if (event.path === activeTabPath && editorRef.current) {
+          if (tab.path === activeTabPath && editorRef.current) {
             const editor = editorRef.current;
             if (editor.getValue() !== latestContent) {
               setEditorValueProgrammatically(editor, latestContent);
@@ -360,8 +352,26 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
           }
         }
       } catch (error) {
-        console.warn(`Failed to reload file ${event.path}:`, error);
+        console.warn(`Failed to reload file ${tab.path}:`, error);
       }
+    };
+
+    const unsubscribe = window.electronAPI.file.onChange(async (event) => {
+      // Skip delete events; handle both 'update' and 'create'.
+      // Claude CLI uses atomic writes (write to .tmp + rename), which @parcel/watcher
+      // reports as 'create' for the destination file rather than 'update'.
+      if (event.type === 'delete') return;
+
+      // Bulk mode: agent modified too many files at once, reload all open tabs
+      if (event.path.endsWith('/.enso-bulk')) {
+        await Promise.all(tabs.map((tab) => reloadTab(tab)));
+        return;
+      }
+
+      // Check if the changed file is open in any tab
+      const changedTab = tabs.find((tab) => tab.path === event.path);
+      if (!changedTab) return;
+      await reloadTab(changedTab);
     });
 
     return () => {
