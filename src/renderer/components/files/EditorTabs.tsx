@@ -76,8 +76,11 @@ export function EditorTabs({
 
   useEffect(() => {
     if (!activeTabPath) return;
-    const tabEl = tabRefsRef.current.get(activeTabPath);
-    tabEl?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    const frameId = requestAnimationFrame(() => {
+      const tabEl = tabRefsRef.current.get(activeTabPath);
+      tabEl?.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+    });
+    return () => cancelAnimationFrame(frameId);
   }, [activeTabPath]);
 
   const canCloseOthers = !!onCloseOthers && !!menuTabPath && tabs.length > 1;
