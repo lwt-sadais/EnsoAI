@@ -1,5 +1,6 @@
 import { ChevronDown, FolderGit2, GitBranch, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/i18n';
 import { SmoothCollapse } from '@/components/ui/smooth-collapse';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,7 @@ export function RepositoryList({
   onCheckout,
   isCheckingOut,
 }: RepositoryListProps) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(true);
   const tabsListRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +47,7 @@ export function RepositoryList({
       const container =
         tabsListRef.current.querySelector<HTMLElement>('[data-slot="tabs-list"]') ??
         tabsListRef.current;
-      const active = container.querySelector<HTMLElement>('[data-state=active]');
+      const active = container.querySelector<HTMLElement>('[data-state="active"]');
       if (!active) return;
       const cr = container.getBoundingClientRect();
       const ar = active.getBoundingClientRect();
@@ -87,7 +89,7 @@ export function RepositoryList({
             )}
           />
           <FolderGit2 className="h-4 w-4" />
-          <span className="text-sm font-medium flex-1">Repositories</span>
+          <span className="text-sm font-medium flex-1">{t('Repositories')}</span>
           <span className="text-xs text-muted-foreground">({repositories.length})</span>
         </button>
 
