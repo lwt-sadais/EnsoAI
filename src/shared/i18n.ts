@@ -633,6 +633,13 @@ export const zhTranslations: Record<string, string> = {
   'Tree + editor in one panel': '文件树与编辑器在同一面板',
   'Split sidebar': '分栏模式',
   'Dedicated file sidebar + editor': '独立文件侧栏 + 编辑器',
+  'Repository List Display': '仓库列表展示',
+  'Choose how repositories and submodules are displayed in source control':
+    '选择版本管理中仓库和子模块的展示方式',
+  List: '列表',
+  'VSCode-style collapsible list': 'VSCode 风格可折叠列表',
+  Tabs: '标签页',
+  'Horizontal tabs for quick switching': '水平标签页，快速切换',
   'Integrated tree + editor (original)': '树与编辑器一体（原有）',
   Original: '原有',
   'Split sidebar + editor (current)': '文件侧栏与编辑器分离（当前）',
