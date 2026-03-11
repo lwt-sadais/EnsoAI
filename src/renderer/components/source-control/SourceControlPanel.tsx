@@ -51,6 +51,7 @@ import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { useSettingsStore } from '@/stores/settings';
 import { useSourceControlStore } from '@/stores/sourceControl';
+import { STORAGE_KEYS, getStoredBoolean } from '@/App/storage';
 import { BranchSwitcher } from './BranchSwitcher';
 import { ChangesList } from './ChangesList';
 import { CommitBox } from './CommitBox';
@@ -78,10 +79,17 @@ export function SourceControlPanel({
   const queryClient = useQueryClient();
   const repositoryListDisplayMode = useSettingsStore((s) => s.repositoryListDisplayMode);
 
-  // Accordion state - collapsible sections
-  const [changesExpanded, setChangesExpanded] = useState(true);
-  const [historyExpanded, setHistoryExpanded] = useState(false);
+  // Accordion state - collapsible sections (persisted to localStorage)
+  const [changesExpanded, setChangesExpanded] = useState(() =>
+    getStoredBoolean(STORAGE_KEYS.SC_CHANGES_EXPANDED, true)
+  );
+  const [historyExpanded, setHistoryExpanded] = useState(() =>
+    getStoredBoolean(STORAGE_KEYS.SC_HISTORY_EXPANDED, false)
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Branch checkout state - tracks which repo is being checked out
+  const [checkingOutPath, setCheckingOutPath] = useState<string | null>(null);
 
   // Selected repository - null means main repo, string means submodule path
   const [selectedSubmodulePath, setSelectedSubmodulePath] = useState<string | null>(null);
@@ -412,6 +420,7 @@ export function SourceControlPanel({
       // Detect submodule by matching repoPath against the submodule list
       const submodule = submodules.find((s) => rootPath && repoPath === joinPath(rootPath, s.path));
 
+      setCheckingOutPath(repoPath);
       try {
         if (submodule && rootPath) {
           // Use dedicated submodule mutation so onSuccess invalidates
@@ -449,6 +458,8 @@ export function SourceControlPanel({
           type: 'error',
           timeout: 5000,
         });
+      } finally {
+        setCheckingOutPath(null);
       }
     },
     [
@@ -874,7 +885,7 @@ export function SourceControlPanel({
             isLoading={submodulesLoading}
             displayMode={repositoryListDisplayMode}
             onCheckout={handleBranchCheckout}
-            isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
+            checkingOutPath={checkingOutPath}
           />
 
           {/* Changes Section (Collapsible) */}
@@ -887,7 +898,11 @@ export function SourceControlPanel({
             <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors pr-4">
               <button
                 type="button"
-                onClick={() => setChangesExpanded(!changesExpanded)}
+                onClick={() => {
+                  const next = !changesExpanded;
+                  setChangesExpanded(next);
+                  localStorage.setItem(STORAGE_KEYS.SC_CHANGES_EXPANDED, String(next));
+                }}
                 className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
               >
                 <ChevronDown
@@ -914,7 +929,7 @@ export function SourceControlPanel({
                   if (selectedRepoPath) await handleCreateBranch(selectedRepoPath, name);
                 }}
                 isLoading={currentBranchesLoading}
-                isCheckingOut={checkoutMutation.isPending || checkoutSubmoduleMutation.isPending}
+                isCheckingOut={checkingOutPath === selectedRepoPath}
                 size="xs"
               />
             </div>
@@ -992,7 +1007,11 @@ export function SourceControlPanel({
             <div className="group flex items-center shrink-0 rounded-sm hover:bg-accent/50 transition-colors">
               <button
                 type="button"
-                onClick={() => setHistoryExpanded(!historyExpanded)}
+                onClick={() => {
+                  const next = !historyExpanded;
+                  setHistoryExpanded(next);
+                  localStorage.setItem(STORAGE_KEYS.SC_HISTORY_EXPANDED, String(next));
+                }}
                 className="flex flex-1 items-center gap-2 px-4 py-2 text-left focus:outline-none"
               >
                 <ChevronDown

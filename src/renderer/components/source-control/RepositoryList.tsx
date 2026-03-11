@@ -1,6 +1,7 @@
 import { ChevronDown, FolderGit2, GitBranch, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/i18n';
+import { STORAGE_KEYS, getStoredBoolean } from '@/App/storage';
 import { SmoothCollapse } from '@/components/ui/smooth-collapse';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -16,7 +17,8 @@ interface RepositoryListProps {
   displayMode?: 'tabs' | 'list';
   /** Branch checkout handler for list mode inline BranchSwitcher */
   onCheckout?: (repoPath: string, branch: string) => void;
-  isCheckingOut?: boolean;
+  /** Path of the repository currently being checked out, or null if none */
+  checkingOutPath?: string | null;
 }
 
 /**
@@ -31,10 +33,12 @@ export function RepositoryList({
   isLoading,
   displayMode = 'tabs',
   onCheckout,
-  isCheckingOut,
+  checkingOutPath,
 }: RepositoryListProps) {
   const { t } = useI18n();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(() =>
+    getStoredBoolean(STORAGE_KEYS.SC_REPO_LIST_EXPANDED, true)
+  );
   const tabsListRef = useRef<HTMLDivElement>(null);
 
   // Scroll active tab into view when selectedId changes
@@ -79,7 +83,11 @@ export function RepositoryList({
         {/* Header */}
         <button
           type="button"
-          onClick={() => setExpanded((v) => !v)}
+          onClick={() => {
+            const next = !expanded;
+            setExpanded(next);
+            localStorage.setItem(STORAGE_KEYS.SC_REPO_LIST_EXPANDED, String(next));
+          }}
           className="group flex items-center gap-2 px-4 py-2 text-left hover:bg-accent/50 transition-colors"
         >
           <ChevronDown
@@ -103,7 +111,7 @@ export function RepositoryList({
                 isSelected={selectedId === repo.path}
                 onSelect={() => onSelect(repo.path)}
                 onCheckout={onCheckout ? (branch) => onCheckout(repo.path, branch) : undefined}
-                isCheckingOut={isCheckingOut}
+                isCheckingOut={checkingOutPath === repo.path}
               />
             ))}
           </div>
