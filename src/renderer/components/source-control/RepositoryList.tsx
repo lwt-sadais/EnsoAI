@@ -42,6 +42,7 @@ export function RepositoryList({
   const tabsListRef = useRef<HTMLDivElement>(null);
 
   // Scroll active tab into view when selectedId changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: selectedId drives scroll target
   useEffect(() => {
     if (displayMode !== 'tabs') return;
     // rAF ensures the active attribute and layout are flushed before measuring
@@ -62,7 +63,7 @@ export function RepositoryList({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [displayMode]);
+  }, [displayMode, selectedId]);
 
   if (isLoading) {
     return (
@@ -137,7 +138,7 @@ export function RepositoryList({
             <TabsTrigger
               key={repo.path}
               value={repo.path}
-              className="h-9 gap-1.5 px-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent shrink-0 w-auto"
+              className="h-9 gap-1.5 px-3 rounded-none border-b-2 border-transparent data-active:border-primary data-active:bg-transparent shrink-0 w-auto"
             >
               <span className="text-sm whitespace-nowrap">{repo.name}</span>
               {repo.changesCount > 0 && (
