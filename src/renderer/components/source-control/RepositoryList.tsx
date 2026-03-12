@@ -1,9 +1,9 @@
 import { ChevronDown, FolderGit2, GitBranch, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { useI18n } from '@/i18n';
-import { STORAGE_KEYS, getStoredBoolean } from '@/App/storage';
+import { getStoredBoolean, STORAGE_KEYS } from '@/App/storage';
 import { SmoothCollapse } from '@/components/ui/smooth-collapse';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { BranchSwitcher } from './BranchSwitcher';
 import type { Repository } from './types';
@@ -51,7 +51,7 @@ export function RepositoryList({
       const container =
         tabsListRef.current.querySelector<HTMLElement>('[data-slot="tabs-list"]') ??
         tabsListRef.current;
-      const active = container.querySelector<HTMLElement>('[data-state="active"]');
+      const active = container.querySelector<HTMLElement>('[data-active]');
       if (!active) return;
       const cr = container.getBoundingClientRect();
       const ar = active.getBoundingClientRect();
@@ -62,7 +62,7 @@ export function RepositoryList({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [displayMode, selectedId]);
+  }, [displayMode]);
 
   if (isLoading) {
     return (

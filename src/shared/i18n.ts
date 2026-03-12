@@ -331,7 +331,7 @@ export const zhTranslations: Record<string, string> = {
   'Remove repository confirm': '移除仓库',
   'Remove repository description': '此操作只会从应用中移除，不会删除本地文件。',
   'Repository Settings': '仓库设置',
-  Repositories: '存储库',
+  Repositories: '仓库列表',
   'Auto-initialize new worktrees': '自动初始化新 Worktree',
   'Automatically run init script when creating new worktrees':
     '创建新 Worktree 时自动运行初始化脚本',
