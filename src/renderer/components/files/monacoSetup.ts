@@ -241,9 +241,11 @@ monaco.languages.registerDocumentSymbolProvider('java', {
       methodMatch = methodRe.exec(text);
     }
 
-    // Match field declarations (modifiers + type + name)
+    // Match field declarations (optional modifiers + type + name)
+    // Modifiers are optional (*) to support package-private fields like `String name;`
+    // Type name must not be a Java keyword to avoid false matches on statements
     const fieldRe =
-      /^\s*((?:(?:public|private|protected|static|final|volatile|transient)\s+)+)(\w+(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*(?:=|;)/gm;
+      /^\s*((?:(?:public|private|protected|static|final|volatile|transient)\s+)*)(?!void|return|new|if|for|while|switch|try|throw|catch|import|class|interface|enum\b)(\w+(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*(?:=|;)/gm;
     let fieldMatch: RegExpExecArray | null = fieldRe.exec(text);
     while (fieldMatch !== null) {
       const fieldName = fieldMatch[3];
@@ -374,6 +376,40 @@ monaco.languages.registerDocumentSymbolProvider('vue', {
       let i = 0;
       while (i < body.length) {
         const ch = body[i];
+
+        // Skip line comments: // ...
+        if (ch === '/' && body[i + 1] === '/') {
+          i += 2;
+          while (i < body.length && body[i] !== '\n') i++;
+          continue;
+        }
+
+        // Skip block comments: /* ... */
+        if (ch === '/' && body[i + 1] === '*') {
+          i += 2;
+          while (i < body.length && !(body[i] === '*' && body[i + 1] === '/')) i++;
+          i += 2;
+          continue;
+        }
+
+        // Skip string literals: '...', "...", `...` (with escape handling)
+        if (ch === '"' || ch === "'" || ch === '`') {
+          const quote = ch;
+          i++;
+          while (i < body.length) {
+            if (body[i] === '\\') {
+              i += 2; // skip escaped character
+              continue;
+            }
+            if (body[i] === quote) {
+              i++;
+              break;
+            }
+            i++;
+          }
+          continue;
+        }
+
         if (ch === '{' || ch === '[' || ch === '(') {
           depth++;
           i++;
