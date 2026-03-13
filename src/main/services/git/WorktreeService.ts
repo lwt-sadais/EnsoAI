@@ -98,27 +98,41 @@ export class WorktreeService {
   ): Promise<string[]> {
     const warnings: string[] = [];
 
+    let worktreeDeleted = false;
     try {
       await git.raw(['worktree', 'prune']);
       await git.raw(['worktree', 'remove', '--force', this.toGitPath(worktreePath)]);
-
-      // Delete branch if requested
-      if (options?.deleteBranch && options.branchName) {
-        const branchWarning = await this.deleteBranchSafely(git, options.branchName);
-        if (branchWarning) {
-          warnings.push(branchWarning);
-        }
-      }
+      worktreeDeleted = true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      warnings.push(`Failed to delete worktree: ${msg}`);
 
-      // Still try to delete the branch if worktree deletion failed
-      if (options?.deleteBranch && options.branchName) {
-        const branchWarning = await this.deleteBranchSafely(git, options.branchName);
-        if (branchWarning) {
-          warnings.push(branchWarning);
+      // On Windows, locked files cause "Permission denied" — fall back to force removal
+      if (msg.includes('Permission denied') && existsSync(worktreePath)) {
+        await killProcessesInDirectory(worktreePath);
+        // Wait briefly for processes to release file handles
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        try {
+          if (process.platform === 'win32') {
+            await execAsync(`rmdir /s /q "${worktreePath}"`);
+          } else {
+            await rm(worktreePath, { recursive: true, force: true });
+          }
+          // Clean up the stale worktree entry from git's registry
+          await git.raw(['worktree', 'prune']);
+          worktreeDeleted = true;
+        } catch {
+          warnings.push(`Failed to delete worktree: ${msg}`);
         }
+      } else {
+        warnings.push(`Failed to delete worktree: ${msg}`);
+      }
+    }
+
+    // Delete branch if requested, regardless of whether worktree deletion succeeded
+    if (options?.deleteBranch && options.branchName) {
+      const branchWarning = await this.deleteBranchSafely(git, options.branchName);
+      if (branchWarning) {
+        warnings.push(branchWarning);
       }
     }
 
