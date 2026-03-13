@@ -214,8 +214,11 @@ monaco.languages.registerDocumentSymbolProvider('java', {
 
     // Match method declarations (modifiers + return-type + name + params)
     // Note: 'override' is removed — it is a Java annotation (@Override), not a modifier keyword
+    // Negative lookahead before return type prevents access-modifier keywords (public, private, …)
+    // from being misread as the return type when the modifiers group matches zero times.
+    // Without this, `public VerifySymbols()` would be parsed as: returnType=public, name=VerifySymbols.
     const methodRe =
-      /^\s*((?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*)(<[^>]+>\s+)?(\w+(?:\[\])*(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws\s+\w+(?:\s*,\s*\w+)*)?\s*(?:\{|;)/gm;
+      /^\s*((?:(?:public|private|protected|static|final|abstract|synchronized|native)\s+)*)(<[^>]+>\s+)?(?!(?:public|private|protected|static|final|abstract|synchronized|native)\b)(\w+(?:\[\])*(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*\(([^)]*)\)\s*(?:throws\s+\w+(?:\s*,\s*\w+)*)?\s*(?:\{|;)/gm;
     let methodMatch: RegExpExecArray | null = methodRe.exec(text);
     while (methodMatch !== null) {
       const modifiers = methodMatch[1].trim();
@@ -241,13 +244,50 @@ monaco.languages.registerDocumentSymbolProvider('java', {
       methodMatch = methodRe.exec(text);
     }
 
+    // Match constructor declarations: optional access modifier + UpperCaseName + ( params )
+    // Constructors have no return type; name starts with uppercase (Java convention)
+    const ctorRe =
+      /^\s*((?:(?:public|private|protected)\s+)*)([A-Z]\w*)\s*\(([^)]*)\)\s*(?:throws\s+[\w,\s]+)?\s*\{/gm;
+    let ctorMatch: RegExpExecArray | null = ctorRe.exec(text);
+    while (ctorMatch !== null) {
+      const ctorName = ctorMatch[2];
+      const params = ctorMatch[3].trim();
+      // Include params in name so the full signature is visible in the symbol picker
+      const displayName = `${ctorName}(${params})`;
+      const nameIdx = ctorMatch[0].indexOf(ctorName, (ctorMatch[1] ?? '').length);
+      pushSymbol(
+        symbols,
+        model,
+        displayName,
+        ctorMatch[1].trim(),
+        monaco.languages.SymbolKind.Constructor,
+        ctorMatch.index,
+        ctorMatch[0].length,
+        ctorMatch.index + nameIdx,
+        ctorName.length
+      );
+      ctorMatch = ctorRe.exec(text);
+    }
+
     // Match field declarations (optional modifiers + type + name)
     // Modifiers are optional (*) to support package-private fields like `String name;`
     // Type name must not be a Java keyword to avoid false matches on statements
     const fieldRe =
-      /^\s*((?:(?:public|private|protected|static|final|volatile|transient)\s+)*)(?!void|return|new|if|for|while|switch|try|throw|catch|import|class|interface|enum\b)(\w+(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*(?:=|;)/gm;
+      /^\s*((?:(?:public|private|protected|static|final|volatile|transient)\s+)*)(?!(?:void|return|new|if|for|while|switch|try|throw|catch|import|class|interface|enum)\b)(\w+(?:<[^>]*>)?(?:\[\])*)\s+(\w+)\s*(?:=|;)/gm;
     let fieldMatch: RegExpExecArray | null = fieldRe.exec(text);
     while (fieldMatch !== null) {
+      const modifiers = fieldMatch[1].trim();
+      // Without modifiers, skip deeply-indented lines (likely local variables inside methods).
+      // Allow single-level indentation: ≤1 tab or ≤4 spaces.
+      if (!modifiers) {
+        const leadingWs = fieldMatch[0].match(/^\s*/)?.[0] ?? '';
+        const tabs = (leadingWs.match(/\t/g) ?? []).length;
+        const spaces = leadingWs.replace(/\t/g, '').length;
+        if (tabs > 1 || spaces > 4) {
+          fieldMatch = fieldRe.exec(text);
+          continue;
+        }
+      }
       const fieldName = fieldMatch[3];
       const typeName = fieldMatch[2];
       const nameIdx = fieldMatch[0].lastIndexOf(fieldName);
@@ -446,6 +486,53 @@ monaco.languages.registerDocumentSymbolProvider('vue', {
       return keys;
     }
 
+    /**
+     * Walk from `start` (first char after opening `{`) to find the matching closing `}`,
+     * skipping string literals and line/block comments.
+     * Returns the index of the closing `}`.
+     */
+    function findClosingBrace(source: string, start: number): number {
+      let depth = 1;
+      let i = start;
+      while (i < source.length && depth > 0) {
+        const ch = source[i];
+        // Skip line comments
+        if (ch === '/' && source[i + 1] === '/') {
+          i += 2;
+          while (i < source.length && source[i] !== '\n') i++;
+          continue;
+        }
+        // Skip block comments
+        if (ch === '/' && source[i + 1] === '*') {
+          i += 2;
+          while (i < source.length && !(source[i] === '*' && source[i + 1] === '/')) i++;
+          i += 2;
+          continue;
+        }
+        // Skip string literals: '...', "...", `...`
+        if (ch === '"' || ch === "'" || ch === '`') {
+          const quote = ch;
+          i++;
+          while (i < source.length) {
+            if (source[i] === '\\') {
+              i += 2;
+              continue;
+            }
+            if (source[i] === quote) {
+              i++;
+              break;
+            }
+            i++;
+          }
+          continue;
+        }
+        if (ch === '{') depth++;
+        else if (ch === '}') depth--;
+        i++;
+      }
+      return i - 1; // index of the closing '}'
+    }
+
     /** Extract keys from a top-level Options API section like `methods: { ... }` */
     function extractSection(
       source: string,
@@ -458,14 +545,8 @@ monaco.languages.registerDocumentSymbolProvider('vue', {
       if (!sectionMatch) return;
 
       const bodyStart = sectionMatch.index + sectionMatch[0].length;
-      let depth = 1;
-      let i = bodyStart;
-      while (i < source.length && depth > 0) {
-        if (source[i] === '{') depth++;
-        else if (source[i] === '}') depth--;
-        i++;
-      }
-      const sectionBody = source.slice(bodyStart, i - 1);
+      const closeIdx = findClosingBrace(source, bodyStart);
+      const sectionBody = source.slice(bodyStart, closeIdx);
       const bodyOffset = offset + bodyStart;
 
       for (const { name, localIndex } of collectTopLevelKeys(sectionBody)) {
@@ -491,14 +572,8 @@ monaco.languages.registerDocumentSymbolProvider('vue', {
       if (!dataMatch) return;
 
       const returnBraceIdx = dataMatch.index + dataMatch[0].length - 1; // points to '{'
-      let depth = 1;
-      let i = returnBraceIdx + 1;
-      while (i < source.length && depth > 0) {
-        if (source[i] === '{') depth++;
-        else if (source[i] === '}') depth--;
-        i++;
-      }
-      const returnBody = source.slice(returnBraceIdx + 1, i - 1);
+      const closeIdx = findClosingBrace(source, returnBraceIdx + 1);
+      const returnBody = source.slice(returnBraceIdx + 1, closeIdx);
       const returnOffset = offset + returnBraceIdx + 1;
 
       for (const { name, localIndex } of collectTopLevelKeys(returnBody)) {
