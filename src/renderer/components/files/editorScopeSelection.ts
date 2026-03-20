@@ -23,58 +23,8 @@ interface OffsetRange {
 
 const INDENT_RE = /^[ \t]*/;
 
-/**
- * Find the innermost bracket scope ( () [] {} ) containing cursorOffset.
- * Handles nested brackets via a nesting counter.
- * If the bracket is unclosed, selects from the opening bracket to end of line.
- */
-function findBracketScope(
-  text: string,
-  cursorOffset: number,
-  openChar: string,
-  closeChar: string
-): OffsetRange | null {
-  // Scan backward for the nearest unmatched opening bracket
-  let nesting = 0;
-  let openPos = -1;
-  for (let i = cursorOffset - 1; i >= 0; i--) {
-    const ch = text[i];
-    if (ch === closeChar) {
-      nesting++;
-    } else if (ch === openChar) {
-      if (nesting === 0) {
-        openPos = i;
-        break;
-      }
-      nesting--;
-    }
-  }
-  if (openPos === -1) return null;
-
-  // Scan forward from the opening bracket for its matching closing bracket
-  nesting = 0;
-  let closePos = -1;
-  for (let i = openPos + 1; i < text.length; i++) {
-    const ch = text[i];
-    if (ch === openChar) {
-      nesting++;
-    } else if (ch === closeChar) {
-      if (nesting === 0) {
-        closePos = i;
-        break;
-      }
-      nesting--;
-    }
-  }
-
-  if (closePos === -1) {
-    // Unclosed bracket: graceful degradation — select to end of line
-    const lineEnd = text.indexOf('\n', openPos + 1);
-    return { start: openPos + 1, end: lineEnd === -1 ? text.length : lineEnd };
-  }
-
-  return { start: openPos + 1, end: closePos };
-}
+// Limit text extraction to a window around the cursor for large-file performance.
+const SCAN_WINDOW_LINES = 500;
 
 /** Count consecutive backslashes immediately before position i. */
 function countBackslashes(text: string, i: number): number {
@@ -85,6 +35,73 @@ function countBackslashes(text: string, i: number): number {
     j--;
   }
   return count;
+}
+
+/**
+ * Find all bracket scopes ( () [] {} ) enclosing cursorOffset.
+ * Uses a single forward pass with string-context tracking so brackets inside
+ * string literals are never mistaken for scope boundaries.
+ * Unclosed brackets gracefully degrade — selecting from the opening to end of line.
+ */
+function findAllBracketScopes(text: string, cursorOffset: number): OffsetRange[] {
+  const closeToOpen = new Map<string, string>([
+    [')', '('],
+    [']', '['],
+    ['}', '{'],
+  ]);
+  const stacks = new Map<string, number[]>([
+    ['(', []],
+    ['[', []],
+    ['{', []],
+  ]);
+  const candidates: OffsetRange[] = [];
+  let inString: string | null = null;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+
+    // Track string context so brackets inside literals are ignored
+    if (inString !== null) {
+      if (ch === inString && countBackslashes(text, i) % 2 === 0) {
+        inString = null;
+      } else if (inString !== '`' && ch === '\n') {
+        inString = null; // treat unterminated string as ending at newline
+      }
+      continue;
+    }
+    if ((ch === '"' || ch === "'" || ch === '`') && countBackslashes(text, i) % 2 === 0) {
+      inString = ch;
+      continue;
+    }
+
+    const matchingOpen = closeToOpen.get(ch);
+    if (matchingOpen !== undefined) {
+      const stack = stacks.get(matchingOpen)!;
+      if (stack.length > 0) {
+        const openPos = stack.pop()!;
+        if (openPos < cursorOffset && cursorOffset <= i) {
+          candidates.push({ start: openPos + 1, end: i });
+        }
+      }
+    } else if (stacks.has(ch)) {
+      stacks.get(ch)!.push(i);
+    }
+  }
+
+  // Graceful degradation for unclosed brackets: select from opening to end of line
+  for (const [, stack] of stacks) {
+    for (const openPos of stack) {
+      if (openPos < cursorOffset) {
+        const lineEnd = text.indexOf('\n', openPos + 1);
+        const end = lineEnd === -1 ? text.length : lineEnd;
+        if (cursorOffset <= end) {
+          candidates.push({ start: openPos + 1, end });
+        }
+      }
+    }
+  }
+
+  return candidates;
 }
 
 /**
@@ -142,21 +159,23 @@ function findIndentScope(
 
   if (currentIndent === 0) return null; // Top-level code has no enclosing indent scope
 
-  // Walk upward to find the first line of this indented block
+  // Walk upward to find the first line of this indented block.
+  // Stop at blank lines — they separate logically independent blocks.
   let startLine = lineNumber;
   for (let i = lineNumber - 1; i >= 1; i--) {
     const line = model.getLineContent(i);
-    if (line.trim() === '') continue; // Skip blank lines
+    if (line.trim() === '') break;
     const indent = INDENT_RE.exec(line)?.[0].length ?? 0;
     if (indent < currentIndent) break;
     startLine = i;
   }
 
-  // Walk downward to find the last line of this indented block
+  // Walk downward to find the last line of this indented block.
+  // Stop at blank lines — they separate logically independent blocks.
   let endLine = lineNumber;
   for (let i = lineNumber + 1; i <= totalLines; i++) {
     const line = model.getLineContent(i);
-    if (line.trim() === '') continue;
+    if (line.trim() === '') break;
     const indent = INDENT_RE.exec(line)?.[0].length ?? 0;
     if (indent < currentIndent) break;
     endLine = i;
@@ -185,8 +204,19 @@ export function computeScopeSelection(
   position: monaco.IPosition,
   config: ScopeSelectionConfig = DEFAULT_SCOPE_CONFIG
 ): monaco.IRange | null {
-  const text = model.getValue();
-  const cursorOffset = model.getOffsetAt(position);
+  // Limit text extraction to a window around the cursor for performance on large files.
+  // Most useful bracket/quote scopes are within this line range.
+  const scanStartLine = Math.max(1, position.lineNumber - SCAN_WINDOW_LINES);
+  const scanEndLine = Math.min(model.getLineCount(), position.lineNumber + SCAN_WINDOW_LINES);
+  const scanStartPos = { lineNumber: scanStartLine, column: 1 };
+  const text = model.getValueInRange({
+    startLineNumber: scanStartLine,
+    startColumn: 1,
+    endLineNumber: scanEndLine,
+    endColumn: model.getLineLength(scanEndLine) + 1,
+  });
+  const textStartOffset = model.getOffsetAt(scanStartPos);
+  const cursorOffset = model.getOffsetAt(position) - textStartOffset;
 
   // If the cursor lands on a word character, let Monaco handle its native word
   // selection instead of expanding to the enclosing scope.
@@ -195,14 +225,7 @@ export function computeScopeSelection(
   const candidates: OffsetRange[] = [];
 
   if (config.brackets) {
-    for (const [open, close] of [
-      ['(', ')'],
-      ['[', ']'],
-      ['{', '}'],
-    ]) {
-      const scope = findBracketScope(text, cursorOffset, open, close);
-      if (scope) candidates.push(scope);
-    }
+    candidates.push(...findAllBracketScopes(text, cursorOffset));
   }
 
   if (config.quotes) {
@@ -215,7 +238,12 @@ export function computeScopeSelection(
   // Only fall back to indentation scope when no bracket/quote scope applies
   if (candidates.length === 0 && config.indentation) {
     const scope = findIndentScope(model, position);
-    if (scope) candidates.push(scope);
+    if (scope) {
+      // findIndentScope returns absolute model offsets; convert to scan-window-relative
+      const relStart = Math.max(0, scope.start - textStartOffset);
+      const relEnd = Math.min(text.length, scope.end - textStartOffset);
+      if (relStart < relEnd) candidates.push({ start: relStart, end: relEnd });
+    }
   }
 
   if (candidates.length === 0) return null;
@@ -223,8 +251,8 @@ export function computeScopeSelection(
   // Select the smallest (innermost) enclosing scope
   const best = candidates.reduce((a, b) => (b.end - b.start < a.end - a.start ? b : a));
 
-  const start = model.getPositionAt(best.start);
-  const end = model.getPositionAt(best.end);
+  const start = model.getPositionAt(textStartOffset + best.start);
+  const end = model.getPositionAt(textStartOffset + best.end);
 
   return {
     startLineNumber: start.lineNumber,
@@ -246,7 +274,7 @@ export function setupDoubleClickScope(
   config: ScopeSelectionConfig = DEFAULT_SCOPE_CONFIG
 ): monaco.IDisposable {
   return editor.onMouseDown((e) => {
-    if (e.event.detail !== 2) return;
+    if (e.event.detail !== 2) return; // detail === 2 means a double-click (click count)
     const position = e.target.position;
     if (!position) return;
     const model = editor.getModel();
