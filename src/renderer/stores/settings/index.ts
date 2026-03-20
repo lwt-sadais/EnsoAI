@@ -15,6 +15,7 @@ import {
   defaultClaudeCodeIntegrationSettings,
   defaultCodeReviewSettings,
   defaultCommitMessageGeneratorSettings,
+  defaultEditorKeybindings,
   defaultEditorSettings,
   defaultGitCloneSettings,
   defaultGlobalKeybindings,
@@ -121,6 +122,7 @@ function getInitialState() {
     mainTabKeybindings: defaultMainTabKeybindings,
     sourceControlKeybindings: defaultSourceControlKeybindings,
     searchKeybindings: defaultSearchKeybindings,
+    editorKeybindings: defaultEditorKeybindings,
     globalKeybindings: defaultGlobalKeybindings,
     workspaceKeybindings: defaultWorkspaceKeybindings,
 
@@ -274,6 +276,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMainTabKeybindings: (mainTabKeybindings) => set({ mainTabKeybindings }),
       setSourceControlKeybindings: (sourceControlKeybindings) => set({ sourceControlKeybindings }),
       setSearchKeybindings: (searchKeybindings) => set({ searchKeybindings }),
+      setEditorKeybindings: (editorKeybindings) => set({ editorKeybindings }),
       setGlobalKeybindings: (globalKeybindings) => set({ globalKeybindings }),
       setWorkspaceKeybindings: (workspaceKeybindings) => set({ workspaceKeybindings }),
 

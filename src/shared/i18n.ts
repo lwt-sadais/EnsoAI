@@ -627,6 +627,8 @@ export const zhTranslations: Record<string, string> = {
   'File search shortcuts': '文件搜索快捷键',
   'Search files': '搜索文件',
   'Search content': '搜索内容',
+  'Editor shortcuts': '编辑器快捷键',
+  'Show Symbols': '显示符号列表',
   'Select file': '选择文件',
   'Select folder': '选择文件夹',
   'Select a file from the file tree to begin editing': '从左侧文件树中选择文件以开始编辑',

@@ -149,6 +149,10 @@ export function migrateSettings(
       ...currentState.searchKeybindings,
       ...persisted.searchKeybindings,
     },
+    editorKeybindings: {
+      ...currentState.editorKeybindings,
+      ...persisted.editorKeybindings,
+    },
     globalKeybindings: {
       ...currentState.globalKeybindings,
       ...persisted.globalKeybindings,

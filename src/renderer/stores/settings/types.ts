@@ -81,6 +81,10 @@ export interface SearchKeybindings {
   searchContent: TerminalKeybinding;
 }
 
+export interface EditorKeybindings {
+  gotoSymbol: TerminalKeybinding;
+}
+
 export interface GlobalKeybindings {
   runningProjects: TerminalKeybinding;
 }
@@ -317,6 +321,7 @@ export interface SettingsState {
   mainTabKeybindings: MainTabKeybindings;
   sourceControlKeybindings: SourceControlKeybindings;
   searchKeybindings: SearchKeybindings;
+  editorKeybindings: EditorKeybindings;
   globalKeybindings: GlobalKeybindings;
   workspaceKeybindings: WorkspaceKeybindings;
 
@@ -428,6 +433,7 @@ export interface SettingsState {
   setMainTabKeybindings: (keybindings: MainTabKeybindings) => void;
   setSourceControlKeybindings: (keybindings: SourceControlKeybindings) => void;
   setSearchKeybindings: (keybindings: SearchKeybindings) => void;
+  setEditorKeybindings: (keybindings: EditorKeybindings) => void;
   setGlobalKeybindings: (keybindings: GlobalKeybindings) => void;
   setWorkspaceKeybindings: (keybindings: WorkspaceKeybindings) => void;
 
