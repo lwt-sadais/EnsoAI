@@ -595,5 +595,120 @@ monaco.languages.registerDocumentSymbolProvider('vue', {
   },
 });
 
+// Java FoldingRangeProvider: covers braces, block comments, imports, line-comment groups, and regions.
+// Must be comprehensive because registering ANY FoldingRangeProvider fully replaces IndentRangeProvider.
+monaco.languages.registerFoldingRangeProvider('java', {
+  provideFoldingRanges(model) {
+    const lines = model.getLinesContent();
+    return computeJavaFoldingRanges(lines);
+  },
+});
+
+function computeJavaFoldingRanges(lines: string[]): monaco.languages.FoldingRange[] {
+  const ranges: monaco.languages.FoldingRange[] = [];
+
+  // --- Pass 1: character-level scan for brace blocks and block comments ---
+  let inBlockComment = false;
+  let inString = false;
+  let inCharLiteral = false;
+  const braceStack: number[] = [];
+  let blockCommentStartLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+    let inLineComment = false;
+    let j = 0;
+
+    while (j < line.length) {
+      const ch = line[j];
+      const next = line[j + 1];
+
+      if (inLineComment) {
+        j++;
+        continue;
+      }
+
+      if (inBlockComment) {
+        if (ch === '*' && next === '/') {
+          if (blockCommentStartLine !== -1 && lineNum > blockCommentStartLine) {
+            ranges.push({
+              start: blockCommentStartLine,
+              end: lineNum,
+              kind: monaco.languages.FoldingRangeKind.Comment,
+            });
+          }
+          inBlockComment = false;
+          blockCommentStartLine = -1;
+          j += 2;
+        } else {
+          j++;
+        }
+        continue;
+      }
+
+      if (inString) {
+        if (ch === '\\') {
+          j += 2;
+          continue;
+        }
+        if (ch === '"') inString = false;
+        j++;
+        continue;
+      }
+
+      if (inCharLiteral) {
+        if (ch === '\\') {
+          j += 2;
+          continue;
+        }
+        if (ch === "'") inCharLiteral = false;
+        j++;
+        continue;
+      }
+
+      if (ch === '/' && next === '/') {
+        inLineComment = true;
+        j += 2;
+        continue;
+      }
+      if (ch === '/' && next === '*') {
+        inBlockComment = true;
+        blockCommentStartLine = lineNum;
+        j += 2;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        j++;
+        continue;
+      }
+      if (ch === "'") {
+        inCharLiteral = true;
+        j++;
+        continue;
+      }
+
+      if (ch === '{') {
+        braceStack.push(lineNum);
+        j++;
+        continue;
+      }
+      if (ch === '}') {
+        if (braceStack.length > 0) {
+          const openLine = braceStack.pop()!;
+          if (lineNum > openLine) ranges.push({ start: openLine, end: lineNum });
+        }
+        j++;
+        continue;
+      }
+
+      j++;
+    }
+  }
+
+  return ranges;
+}
+
 export type Monaco = typeof monaco;
 export { monaco };
