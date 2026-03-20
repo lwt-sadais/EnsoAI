@@ -37,6 +37,7 @@ import { BreadcrumbTreeMenu } from './BreadcrumbTreeMenu';
 import { CommentForm, useEditorLineComment } from './EditorLineComment';
 import { EditorTabs } from './EditorTabs';
 import { ExternalModificationBanner } from './ExternalModificationBanner';
+import { setupDoubleClickScope } from './editorScopeSelection';
 import { isImageFile, isPdfFile } from './fileIcons';
 import { ImagePreview } from './ImagePreview';
 import { MarkdownPreview } from './MarkdownPreview';
@@ -556,6 +557,9 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
           });
         },
       });
+
+      // Double-click: select innermost scope (brackets, quotes, indentation)
+      setupDoubleClickScope(editor);
 
       // Restore view state if available
       if (activeTab?.viewState) {
