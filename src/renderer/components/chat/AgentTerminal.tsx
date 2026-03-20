@@ -25,6 +25,8 @@ interface AgentTerminalProps {
   initialized?: boolean;
   activated?: boolean;
   isActive?: boolean;
+  hasPendingCommand?: boolean; // Force terminal activation even when not visible
+  initialPrompt?: string; // Initial prompt to pass as CLI argument (auto-execute)
   canMerge?: boolean; // whether merge option should be enabled (has multiple groups)
   /**
    * When provided, Enhanced Input open state is controlled by parent (e.g. AgentPanel store).
@@ -67,6 +69,8 @@ export function AgentTerminal({
   initialized,
   activated,
   isActive = false,
+  hasPendingCommand = false,
+  initialPrompt,
   canMerge = false,
   enhancedInputOpen: externalEnhancedInputOpen,
   onEnhancedInputOpenChange,
@@ -314,6 +318,33 @@ export function AgentTerminal({
       agentArgs.push(customArgs);
     }
 
+    // Append initial prompt as CLI positional argument (for auto-execute)
+    // Most CLI agents (claude, codex, gemini, etc.) accept a prompt as trailing argument
+    if (initialPrompt) {
+      const isWindows = window.electronAPI?.env?.platform === 'win32';
+
+      if (isWindows) {
+        // Windows: use double quotes with PowerShell/cmd compatible escaping
+        // Escape: backslashes (double them), double quotes (backslash), backticks (PowerShell)
+        const escaped = initialPrompt
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/`/g, '``')
+          .replace(/%/g, '%%') // cmd variable expansion
+          .replace(/\$/g, '`$') // PowerShell variable expansion
+          .replace(/\n/g, ' '); // Replace newlines with spaces for Windows
+        agentArgs.push(`"${escaped}"`);
+      } else {
+        // Unix: use $'...' ANSI-C quoting syntax (bash/zsh compatible)
+        // This handles: backslashes, single quotes, and newlines
+        const escaped = initialPrompt
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/\n/g, '\\n');
+        agentArgs.push(`$'${escaped}'`);
+      }
+    }
+
     const isWindows = window.electronAPI?.env?.platform === 'win32';
     let envVars: Record<string, string> | undefined;
 
@@ -359,6 +390,8 @@ export function AgentTerminal({
       };
     }
 
+    // Safe: all interpolated values (effectiveCommand, agentArgs, tmuxSessionName) are
+    // derived from internal app config / controlled constants, not from arbitrary user input.
     const fullCommand = `${effectiveCommand} ${agentArgs.join(' ')}`.trim();
     const shellName = resolvedShell.shell.toLowerCase();
 
@@ -418,6 +451,7 @@ export function AgentTerminal({
     agentCommand,
     customPath,
     customArgs,
+    initialPrompt,
     resumeSessionId,
     initialized,
     environment,
@@ -686,8 +720,9 @@ export function AgentTerminal({
     if (environment === 'hapi' && hapiGlobalInstalled === null) {
       return false;
     }
-    return isActive;
-  }, [environment, hapiGlobalInstalled, isActive, resolvedShell]);
+    // Force activation when there's a pending command (auto-execute)
+    return isActive || hasPendingCommand;
+  }, [environment, hapiGlobalInstalled, isActive, resolvedShell, hasPendingCommand]);
 
   const {
     containerRef,
