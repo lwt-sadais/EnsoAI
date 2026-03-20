@@ -738,6 +738,37 @@ function computeJavaFoldingRanges(lines: string[]): monaco.languages.FoldingRang
     });
   }
 
+  // --- Pass 3: line-level scan for consecutive single-line comment blocks ---
+  let lineCommentStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const lineNum = i + 1;
+    const trimmed = lines[i].trimStart();
+    const isLineComment = trimmed.startsWith('//');
+    if (isLineComment) {
+      if (lineCommentStart === -1) lineCommentStart = lineNum;
+    } else {
+      if (lineCommentStart !== -1) {
+        const commentEnd = lineNum - 1;
+        if (commentEnd > lineCommentStart) {
+          ranges.push({
+            start: lineCommentStart,
+            end: commentEnd,
+            kind: monaco.languages.FoldingRangeKind.Comment,
+          });
+        }
+        lineCommentStart = -1;
+      }
+    }
+  }
+  // Handle comment block at end of file
+  if (lineCommentStart !== -1 && lines.length > lineCommentStart) {
+    ranges.push({
+      start: lineCommentStart,
+      end: lines.length,
+      kind: monaco.languages.FoldingRangeKind.Comment,
+    });
+  }
+
   return ranges;
 }
 
