@@ -304,9 +304,9 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
     } else if (store.tabs.some((t) => t.path === target.path)) {
       store.setActiveFile(target.path);
       store.setPendingCursor({ path: target.path, line: target.line, column: colOffset });
-    } else {
+    } else if (onNavigateToFileRef.current) {
       store.setPendingCursor({ path: target.path, line: target.line, column: colOffset });
-      onNavigateToFileRef.current?.(target.path);
+      onNavigateToFileRef.current(target.path);
     }
   }, []);
 
@@ -1109,13 +1109,11 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
         const capturedPos = editorRef.current?.getPosition();
         editNavTimerRef.current = setTimeout(() => {
           if (!capturedPath || !capturedPos) return;
-          useEditorStore
-            .getState()
-            .pushNavHistory({
-              path: capturedPath,
-              line: capturedPos.lineNumber,
-              column: capturedPos.column,
-            });
+          useEditorStore.getState().pushNavHistory({
+            path: capturedPath,
+            line: capturedPos.lineNumber,
+            column: capturedPos.column,
+          });
         }, 500);
       }
     },
