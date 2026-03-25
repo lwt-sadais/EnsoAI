@@ -237,7 +237,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       const top = state.navBackStack[state.navBackStack.length - 1];
       // Skip if same file and same line as the top entry (avoid duplicate noise)
-      if (top && top.path === current.path && top.line === current.line) return {};
+      if (
+        top &&
+        top.path === current.path &&
+        top.line === current.line &&
+        top.column === current.column
+      )
+        return {};
       const newStack = [...state.navBackStack, current];
       // Cap back stack at 100 entries
       if (newStack.length > 100) newStack.shift();
@@ -272,15 +278,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newBackStack = [...navBackStack];
     // Push current position (skip if duplicate of top)
     const top = newBackStack[newBackStack.length - 1];
-    if (!top || top.path !== current.path || top.line !== current.line) {
+    if (
+      !top ||
+      top.path !== current.path ||
+      top.line !== current.line ||
+      top.column !== current.column
+    ) {
       newBackStack.push(current);
     }
     // Push target as a checkpoint: allows Alt+Left to return here after the user
     // clicks away. Skip if target is the same position as current (would be no-op).
-    if (target.path !== current.path || target.line !== current.line) {
+    if (
+      target.path !== current.path ||
+      target.line !== current.line ||
+      target.column !== current.column
+    ) {
       newBackStack.push(target);
     }
-    if (newBackStack.length > 100) newBackStack.shift();
+    while (newBackStack.length > 100) newBackStack.shift();
     set({ navBackStack: newBackStack, navForwardStack: newForwardStack });
     return target;
   },
