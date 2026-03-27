@@ -587,6 +587,8 @@ export const zhTranslations: Record<string, string> = {
   'Close All Sessions': '关闭所有会话',
   'Close All Terminal Sessions': '关闭所有终端',
   'Close Terminal Sessions': '关闭终端会话',
+  'Confirm close all agent sessions?': '确认关闭所有 Agent 会话？',
+  'Confirm close all terminal sessions?': '确认关闭所有终端会话？',
   'Confirm exit': '确认退出',
   'Create your first worktree to get started': '创建第一个 Worktree 开始工作',
   'Creating...': '创建中...',
