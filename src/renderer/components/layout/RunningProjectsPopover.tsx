@@ -83,6 +83,28 @@ export function RunningProjectsPopover({
 
   const { worktreesMap } = useWorktreeListMultiple(activeWorktreePaths);
 
+  const totalAgents = useMemo(
+    () => activeWorktreePaths.reduce((sum, p) => sum + (activities[p]?.agentCount ?? 0), 0),
+    [activeWorktreePaths, activities]
+  );
+
+  const totalTerminals = useMemo(
+    () => activeWorktreePaths.reduce((sum, p) => sum + (activities[p]?.terminalCount ?? 0), 0),
+    [activeWorktreePaths, activities]
+  );
+
+  const handleCloseAllAgents = useCallback(() => {
+    for (const path of activeWorktreePaths) {
+      closeAgentSessions(path);
+    }
+  }, [activeWorktreePaths, closeAgentSessions]);
+
+  const handleCloseAllTerminals = useCallback(() => {
+    for (const path of activeWorktreePaths) {
+      closeTerminalSessions(path);
+    }
+  }, [activeWorktreePaths, closeTerminalSessions]);
+
   useEffect(() => {
     if (open) {
       setSearchQuery('');
@@ -303,6 +325,30 @@ export function RunningProjectsPopover({
                 className="h-8 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/70"
               />
             </div>
+            {totalRunning > 0 && (
+              <div className="flex items-center gap-1 border-b px-2 py-1.5">
+                <button
+                  type="button"
+                  disabled={totalAgents === 0}
+                  onClick={handleCloseAllAgents}
+                  className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  title={t('Close All Agent Sessions')}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  {t('Close All Agent Sessions')}
+                </button>
+                <button
+                  type="button"
+                  disabled={totalTerminals === 0}
+                  onClick={handleCloseAllTerminals}
+                  className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
+                  title={t('Close All Terminal Sessions')}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                  {t('Close All Terminal Sessions')}
+                </button>
+              </div>
+            )}
             <div ref={listRef} className="max-h-[60vh] overflow-y-auto p-2">
               {filteredProjects.length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
