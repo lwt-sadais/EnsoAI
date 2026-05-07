@@ -176,6 +176,7 @@ jobs:
           path: out
 
       - name: Build Windows
+        shell: bash
         run: npx electron-builder --win --x64 --publish always -c.publish.owner=${REPO_OWNER} -c.publish.repo=${REPO_NAME}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
