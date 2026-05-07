@@ -113,10 +113,11 @@ jobs:
           fi
 
       - name: Build macOS (${{ matrix.arch }})
-        run: npx electron-builder --mac --${{ matrix.arch }} --publish always
+        run: npx electron-builder --mac --${{ matrix.arch }} --publish always -c.publish.owner=${REPO_OWNER} -c.publish.repo=${REPO_NAME}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -175,10 +176,11 @@ jobs:
           path: out
 
       - name: Build Windows
-        run: npx electron-builder --win --x64 --publish always
+        run: npx electron-builder --win --x64 --publish always -c.publish.owner=${REPO_OWNER} -c.publish.repo=${REPO_NAME}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
