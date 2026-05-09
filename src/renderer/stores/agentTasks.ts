@@ -133,6 +133,11 @@ export const useAgentTasksStore = create<AgentTasksState>()(
         const task = state.tasks[sessionId];
         if (!task) return state;
 
+        // Skip if status hasn't changed to avoid unnecessary re-renders
+        if (task.status === status && (status !== 'waiting' || task.waitingReason === reason)) {
+          return state;
+        }
+
         const updates: Partial<AgentTask> = { status };
 
         if (status === 'running' && !state.startTimes[sessionId]) {
@@ -295,8 +300,12 @@ export const useAgentTasksStore = create<AgentTasksState>()(
           const waitingReason = state.waitingReasons[session.id];
           const persistedDescription = state.descriptions[session.id];
 
-          const taskStatus = mapActivityToTaskStatus(activityState);
+          const derivedStatus = mapActivityToTaskStatus(activityState);
           const model = statusData?.model?.id;
+
+          // Preserve status from direct event handlers (PreToolUse, AskUserQuestion, Stop)
+          // Only use derived status for new tasks (first-time creation)
+          const finalStatus = existingTask ? existingTask.status : derivedStatus;
 
           newTasks[session.id] = {
             sessionId: session.id,
@@ -304,7 +313,7 @@ export const useAgentTasksStore = create<AgentTasksState>()(
             repoPath: session.repoPath,
             repoName: getPathBasename(session.repoPath),
             cwd: session.cwd,
-            status: taskStatus,
+            status: finalStatus,
             description: persistedDescription || session.name,
             startedAt: startTime || existingTask?.startedAt || Date.now(),
             completedAt: completionTime || existingTask?.completedAt,
