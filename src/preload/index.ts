@@ -760,6 +760,14 @@ const electronAPI = {
     sendSnapshotResponse: (snapshot: Record<string, unknown>): void => {
       ipcRenderer.send(IPC_CHANNELS.AGENT_TASK_SNAPSHOT_RESPONSE, snapshot);
     },
+    sendTaskSync: (tasks: Record<string, unknown>): void => {
+      ipcRenderer.send(IPC_CHANNELS.AGENT_TASK_SYNC, tasks);
+    },
+    onTaskSync: (callback: (tasks: Record<string, unknown>) => void): (() => void) => {
+      const handler = (_: unknown, tasks: Record<string, unknown>) => callback(tasks);
+      ipcRenderer.on(IPC_CHANNELS.AGENT_TASK_SYNC, handler);
+      return () => ipcRenderer.off(IPC_CHANNELS.AGENT_TASK_SYNC, handler);
+    },
   },
 
   // Updater

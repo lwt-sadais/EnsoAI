@@ -63,4 +63,12 @@ export function registerAgentTaskPanelHandlers(mainWindow: BrowserWindow): void 
       }
     }
   )
+
+  // Forward task sync from main window to task panel
+  ipcMain.on(IPC_CHANNELS.AGENT_TASK_SYNC, (_event, tasks: Record<string, unknown>) => {
+    const panelWindow = getAgentTaskPanelWindow()
+    if (panelWindow && !panelWindow.isDestroyed()) {
+      panelWindow.webContents.send(IPC_CHANNELS.AGENT_TASK_SYNC, tasks)
+    }
+  })
 }

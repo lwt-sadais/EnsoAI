@@ -276,6 +276,7 @@ export const IPC_CHANNELS = {
   AGENT_TASK_GET_SNAPSHOT: 'agent-task:getSnapshot',
   AGENT_TASK_SNAPSHOT_RESPONSE: 'agent-task:snapshotResponse',
   AGENT_TASK_PANEL_RESET_BOUNDS: 'agent-task:panel:resetBounds',
+  AGENT_TASK_SYNC: 'agent-task:sync',
 
   // Logging
   LOG_UPDATE_CONFIG: 'log:update-config',

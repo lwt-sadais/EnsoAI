@@ -456,6 +456,14 @@ export function initAgentTasksListener(): () => void {
   // Initial sync
   useAgentTasksStore.getState().syncFromSessions();
 
+  // Push task changes to the standalone task panel window
+  const unsubTaskSync = useAgentTasksStore.subscribe(
+    (state) => state.tasks,
+    (tasks) => {
+      window.electronAPI.agentTaskPanel.sendTaskSync(tasks);
+    }
+  );
+
   return () => {
     unsubSessions();
     unsubActivity();
@@ -464,6 +472,7 @@ export function initAgentTasksListener(): () => void {
     unsubStop();
     unsubAsk();
     unsubUserPrompt();
+    unsubTaskSync();
   };
 }
 
@@ -552,10 +561,18 @@ export function initAgentTaskPanelListeners(): () => void {
     }
   );
 
+  // Listen for task sync from main window (covers add/remove/update)
+  const unsubTaskSync = window.electronAPI.agentTaskPanel.onTaskSync(
+    (tasks: Record<string, unknown>) => {
+      loadSnapshot(tasks as Record<string, AgentTask>);
+    }
+  );
+
   return () => {
     unsubPreToolUse();
     unsubStop();
     unsubAsk();
     unsubUserPrompt();
+    unsubTaskSync();
   };
 }
