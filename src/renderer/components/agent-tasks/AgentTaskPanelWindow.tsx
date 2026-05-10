@@ -1,5 +1,5 @@
 import type { AgentTask } from '@shared/types';
-import { ListTodo, RotateCcw } from 'lucide-react';
+import { ListTodo, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -48,6 +48,10 @@ export function AgentTaskPanelWindow() {
     window.electronAPI.agentTaskPanel.resetBounds();
   }, []);
 
+  const handleClose = useCallback(() => {
+    window.electronAPI.agentTaskPanel.toggle();
+  }, []);
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       {/* Header bar - draggable on Windows/Linux */}
@@ -77,6 +81,17 @@ export function AgentTaskPanelWindow() {
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
+          {!isMac && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleClose}
+              className="h-7 w-7"
+              title={t('Close')}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

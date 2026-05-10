@@ -1,8 +1,10 @@
 import { BrowserWindow, app } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import { IPC_CHANNELS } from '@shared/types'
 
 let agentTaskPanelWindow: BrowserWindow | null = null
+let mainWindowRef: BrowserWindow | null = null
 
 const BOUNDS_FILE = join(app.getPath('userData'), 'agent-task-panel-bounds.json')
 
@@ -66,10 +68,14 @@ export function createAgentTaskPanelWindow(): BrowserWindow {
 
   agentTaskPanelWindow = new BrowserWindow(windowOptions)
 
-  // Hide on close instead of destroying
+  // Hide on close instead of destroying, and notify main window
   agentTaskPanelWindow.on('close', (e) => {
     e.preventDefault()
     agentTaskPanelWindow!.hide()
+    // Notify main window that panel is no longer visible
+    if (mainWindowRef && !mainWindowRef.isDestroyed()) {
+      mainWindowRef.webContents.send(IPC_CHANNELS.AGENT_TASK_PANEL_VISIBILITY_CHANGED, false)
+    }
   })
 
   // Persist bounds on move/resize
@@ -138,4 +144,8 @@ export function resetAgentTaskPanelBounds(): void {
     agentTaskPanelWindow.setSize(DEFAULT_BOUNDS.width, DEFAULT_BOUNDS.height)
     agentTaskPanelWindow.center()
   }
+}
+
+export function setMainWindowRef(ref: BrowserWindow): void {
+  mainWindowRef = ref
 }

@@ -6,10 +6,12 @@ import {
   hideAgentTaskPanelWindow,
   isAgentTaskPanelVisible,
   getAgentTaskPanelWindow,
-  resetAgentTaskPanelBounds
+  resetAgentTaskPanelBounds,
+  setMainWindowRef
 } from '../windows/AgentTaskPanelWindow'
 
 export function registerAgentTaskPanelHandlers(mainWindow: BrowserWindow): void {
+  setMainWindowRef(mainWindow)
   // Toggle panel visibility
   ipcMain.handle(IPC_CHANNELS.AGENT_TASK_PANEL_TOGGLE, () => {
     if (isAgentTaskPanelVisible()) {
