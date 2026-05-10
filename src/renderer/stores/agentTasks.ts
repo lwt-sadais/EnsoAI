@@ -489,3 +489,73 @@ function extractWaitingReason(toolInput: string): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Load a snapshot of tasks (used by the agent task panel window to initialize state).
+ */
+export function loadSnapshot(tasks: Record<string, AgentTask>): void {
+  const derived = computeDerivedArrays(tasks);
+  useAgentTasksStore.setState({
+    tasks,
+    ...derived,
+  });
+}
+
+/**
+ * Initialize agent task panel listeners for the standalone task panel window.
+ * Only registers IPC notification listeners (no Zustand store subscriptions,
+ * since the task panel window doesn't have sessions/activity stores).
+ */
+export function initAgentTaskPanelListeners(): () => void {
+  // Listen for PreToolUse -> running
+  const unsubPreToolUse = window.electronAPI.notification.onPreToolUse(
+    (data: { sessionId: string; toolName: string; cwd?: string }) => {
+      // In task panel window, match by sessionId directly
+      const task = useAgentTasksStore.getState().tasks[data.sessionId];
+      if (task) {
+        useAgentTasksStore.getState().updateTaskStatus(data.sessionId, 'running');
+      }
+    }
+  );
+
+  // Listen for Stop -> completed
+  const unsubStop = window.electronAPI.notification.onAgentStop(
+    (data: { sessionId: string; cwd?: string }) => {
+      const task = useAgentTasksStore.getState().tasks[data.sessionId];
+      if (task) {
+        useAgentTasksStore.getState().updateTaskStatus(data.sessionId, 'completed');
+      }
+    }
+  );
+
+  // Listen for AskUserQuestion -> waiting
+  const unsubAsk = window.electronAPI.notification.onAskUserQuestion(
+    (data: { sessionId: string; toolInput: unknown; cwd?: string }) => {
+      const task = useAgentTasksStore.getState().tasks[data.sessionId];
+      if (task) {
+        const reason =
+          data.toolInput && typeof data.toolInput === 'string'
+            ? extractWaitingReason(data.toolInput)
+            : undefined;
+        useAgentTasksStore.getState().updateTaskStatus(data.sessionId, 'waiting', reason);
+      }
+    }
+  );
+
+  // Listen for UserPromptSubmit -> update description
+  const unsubUserPrompt = window.electronAPI.notification.onUserPrompt(
+    (data: { sessionId: string; prompt: string; cwd?: string }) => {
+      const task = useAgentTasksStore.getState().tasks[data.sessionId];
+      if (task && data.prompt) {
+        useAgentTasksStore.getState().updateTaskDescription(data.sessionId, data.prompt);
+      }
+    }
+  );
+
+  return () => {
+    unsubPreToolUse();
+    unsubStop();
+    unsubAsk();
+    unsubUserPrompt();
+  };
+}
