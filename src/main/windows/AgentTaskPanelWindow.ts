@@ -1,4 +1,4 @@
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow, app, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { IPC_CHANNELS } from '@shared/types'
@@ -34,6 +34,30 @@ function saveBounds(bounds: Partial<Electron.Rectangle>): void {
   } catch {
     // ignore
   }
+}
+
+// Calculate default position: below the trigger button, right-aligned with main window
+function calcDefaultBounds(): Electron.Rectangle {
+  if (!mainWindowRef || mainWindowRef.isDestroyed()) {
+    return { x: 0, y: 0, width: DEFAULT_BOUNDS.width, height: DEFAULT_BOUNDS.height }
+  }
+
+  const mainBounds = mainWindowRef.getBounds()
+  const panelWidth = DEFAULT_BOUNDS.width
+  const panelHeight = DEFAULT_BOUNDS.height
+
+  // Right-align with main window
+  const x = mainBounds.x + mainBounds.width - panelWidth
+  // Below the title bar (h-12 = 48px)
+  const y = mainBounds.y + 48
+
+  // Ensure panel stays within screen work area
+  const display = screen.getDisplayMatching(mainBounds)
+  const workArea = display.workArea
+  const clampedX = Math.max(workArea.x, Math.min(x, workArea.x + workArea.width - panelWidth))
+  const clampedY = Math.max(workArea.y, Math.min(y, workArea.y + workArea.height - panelHeight))
+
+  return { x: clampedX, y: clampedY, width: panelWidth, height: panelHeight }
 }
 
 export function createAgentTaskPanelWindow(): BrowserWindow {
@@ -106,6 +130,13 @@ export function createAgentTaskPanelWindow(): BrowserWindow {
 
 export function showAgentTaskPanelWindow(): BrowserWindow {
   const win = createAgentTaskPanelWindow()
+
+  // If no saved position, calculate default position relative to main window
+  const savedBounds = loadBounds()
+  if (savedBounds.x === undefined || savedBounds.y === undefined) {
+    win.setBounds(calcDefaultBounds())
+  }
+
   win.show()
   win.focus()
   return win
@@ -141,8 +172,7 @@ export function isAgentTaskPanelVisible(): boolean {
 
 export function resetAgentTaskPanelBounds(): void {
   if (agentTaskPanelWindow && !agentTaskPanelWindow.isDestroyed()) {
-    agentTaskPanelWindow.setSize(DEFAULT_BOUNDS.width, DEFAULT_BOUNDS.height)
-    agentTaskPanelWindow.center()
+    agentTaskPanelWindow.setBounds(calcDefaultBounds())
   }
 }
 
