@@ -11,7 +11,6 @@ function areAgentTasksEqual(a: AgentTask, b: AgentTask): boolean {
     a.description === b.description &&
     a.startedAt === b.startedAt &&
     a.completedAt === b.completedAt &&
-    a.model === b.model &&
     a.waitingReason === b.waitingReason
   );
 }

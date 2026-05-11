@@ -5,7 +5,6 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { loadJSON, normalizePath, pathsEqual, saveJSON } from '@/App/storage';
 import type { Session } from '@/components/chat/SessionBar';
 import { useAgentSessionsStore } from './agentSessions';
-import { useAgentStatusStore } from './agentStatus';
 import { areAgentTaskRecordsEqual } from './agentTasksEquality';
 import { type AgentActivityState, useWorktreeActivityStore } from './worktreeActivity';
 
@@ -34,15 +33,6 @@ function mapActivityToTaskStatus(activityState: AgentActivityState): AgentTaskSt
     default:
       return 'idle';
   }
-}
-
-function hasNewStatusKeys(
-  current: Record<string, unknown>,
-  next: Record<string, unknown>
-): boolean {
-  const nextKeys = Object.keys(next);
-  if (nextKeys.length !== Object.keys(current).length) return true;
-  return !nextKeys.every((k) => k in current);
 }
 
 interface AgentTasksState {
@@ -279,7 +269,6 @@ export const useAgentTasksStore = create<AgentTasksState>()(
     syncFromSessions: () => {
       const sessions = useAgentSessionsStore.getState().sessions;
       const activityStates = useWorktreeActivityStore.getState().activityStates;
-      const statuses = useAgentStatusStore.getState().statuses;
 
       set((state) => {
         const newTasks: Record<string, AgentTask> = {};
@@ -293,7 +282,6 @@ export const useAgentTasksStore = create<AgentTasksState>()(
         for (const session of sessions) {
           const normalizedCwd = normalizePath(session.cwd);
           const activityState = normalizedActivityMap.get(normalizedCwd) ?? 'idle';
-          const statusData = statuses[session.id] || statuses[session.sessionId || ''];
 
           const existingTask = state.tasks[session.id];
           const startTime = state.startTimes[session.id];
@@ -302,7 +290,6 @@ export const useAgentTasksStore = create<AgentTasksState>()(
           const persistedDescription = state.descriptions[session.id];
 
           const derivedStatus = mapActivityToTaskStatus(activityState);
-          const model = statusData?.model?.id;
 
           // Preserve status from direct event handlers (PreToolUse, AskUserQuestion, Stop)
           // Only use derived status for new tasks (first-time creation)
@@ -318,7 +305,6 @@ export const useAgentTasksStore = create<AgentTasksState>()(
             description: persistedDescription || session.name,
             startedAt: startTime || existingTask?.startedAt || Date.now(),
             completedAt: completionTime || existingTask?.completedAt,
-            model: model || existingTask?.model,
             waitingReason: waitingReason || existingTask?.waitingReason,
           };
         }
@@ -390,13 +376,6 @@ export function initAgentTasksListener(): () => void {
       useAgentTasksStore.getState().syncFromSessions();
     }
   );
-
-  // Sync when status data changes
-  const unsubStatus = useAgentStatusStore.subscribe((state) => {
-    if (hasNewStatusKeys(useAgentTasksStore.getState().tasks, state.statuses)) {
-      useAgentTasksStore.getState().syncFromSessions();
-    }
-  });
 
   // Listen for PreToolUse -> running
   const unsubPreToolUse = window.electronAPI.notification.onPreToolUse(
@@ -472,7 +451,6 @@ export function initAgentTasksListener(): () => void {
   return () => {
     unsubSessions();
     unsubActivity();
-    unsubStatus();
     unsubPreToolUse();
     unsubStop();
     unsubAsk();

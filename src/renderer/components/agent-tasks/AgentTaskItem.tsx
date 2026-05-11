@@ -58,13 +58,8 @@ function AgentTaskItemComponent({ task, onClick }: AgentTaskItemProps) {
       {/* Description */}
       <div className="mt-1.5 min-w-0 truncate text-sm font-medium">{task.description}</div>
 
-      {/* Meta: Model + Time */}
+      {/* Meta: Time */}
       <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
-        {task.model && (
-          <span className="rounded bg-muted/50 px-1.5 py-0.5 font-mono text-[10px]">
-            {task.model}
-          </span>
-        )}
         <span className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
           {formatTime(task.startedAt)}

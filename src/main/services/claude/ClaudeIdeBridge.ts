@@ -60,6 +60,14 @@ interface AtMentionedParams {
   lineEnd: number;
 }
 
+interface AgentStatusUpdatePayload {
+  sessionId: string;
+  model?: unknown;
+  contextWindow?: unknown;
+  cost?: unknown;
+  workspace?: unknown;
+}
+
 // Client connection with associated workspace
 interface ClientConnection {
   ws: WebSocket;
@@ -211,9 +219,55 @@ export async function startClaudeIdeBridge(
 ): Promise<ClaudeIdeBridgeInstance> {
   const { workspaceFolders: initialFolders = [], ideName = 'EnsoAI' } = options;
   const authToken = crypto.randomUUID();
+  const STATUS_UPDATE_MIN_INTERVAL_MS = 500;
 
   // Mutable state for workspace folders
   let currentWorkspaceFolders = [...initialFolders];
+  const pendingStatusUpdates = new Map<string, AgentStatusUpdatePayload>();
+  const lastStatusUpdateSentAt = new Map<string, number>();
+  let statusUpdateFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function sendStatusUpdateToWindows(update: AgentStatusUpdatePayload): void {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send(IPC_CHANNELS.AGENT_STATUS_UPDATE, update);
+      }
+    }
+  }
+
+  function flushPendingStatusUpdates(): void {
+    statusUpdateFlushTimer = null;
+    const updates = [...pendingStatusUpdates.values()];
+    pendingStatusUpdates.clear();
+
+    const now = Date.now();
+    for (const update of updates) {
+      lastStatusUpdateSentAt.set(update.sessionId, now);
+      sendStatusUpdateToWindows(update);
+    }
+  }
+
+  function scheduleStatusUpdateFlush(delay: number): void {
+    if (statusUpdateFlushTimer) {
+      return;
+    }
+    statusUpdateFlushTimer = setTimeout(flushPendingStatusUpdates, delay);
+  }
+
+  function queueStatusUpdate(update: AgentStatusUpdatePayload): void {
+    const now = Date.now();
+    const lastSentAt = lastStatusUpdateSentAt.get(update.sessionId) ?? 0;
+    const elapsed = now - lastSentAt;
+
+    if (elapsed >= STATUS_UPDATE_MIN_INTERVAL_MS && !pendingStatusUpdates.has(update.sessionId)) {
+      lastStatusUpdateSentAt.set(update.sessionId, now);
+      sendStatusUpdateToWindows(update);
+      return;
+    }
+
+    pendingStatusUpdates.set(update.sessionId, update);
+    scheduleStatusUpdateFlush(Math.max(0, STATUS_UPDATE_MIN_INTERVAL_MS - elapsed));
+  }
 
   const httpServer = http.createServer((req, res) => {
     // Handle POST /agent-hook for Claude hook notifications (Stop, PermissionRequest, etc.)
@@ -226,14 +280,6 @@ export async function startClaudeIdeBridge(
         try {
           const data = JSON.parse(body);
           const sessionId = data.session_id;
-
-          // Debug: Log all hook events to understand Claude's workflow
-          console.log('[ClaudeIdeBridge] Hook received:', {
-            event: data.hook_event_name,
-            tool: data.tool_name,
-            sessionId: sessionId?.slice(0, 8),
-            cwd: data.cwd?.split('/').slice(-2).join('/'),
-          });
 
           // Log hook data with smart filtering
           // Only log significant events to reduce noise while maintaining debuggability
@@ -413,24 +459,15 @@ export async function startClaudeIdeBridge(
           const data = JSON.parse(body);
 
           const sessionId = data.session_id;
-          const workspaceInfo = data.workspace?.current_dir?.split('/').slice(-2).join('/');
-          console.log(
-            `[ClaudeIdeBridge] STATUS_UPDATE ${sessionId?.slice(0, 8)} (${data.model || 'unknown'}) at ${workspaceInfo || 'unknown'}`
-          );
 
           if (sessionId) {
-            // Broadcast status update to all windows
-            for (const window of BrowserWindow.getAllWindows()) {
-              if (!window.isDestroyed()) {
-                window.webContents.send(IPC_CHANNELS.AGENT_STATUS_UPDATE, {
-                  sessionId,
-                  model: data.model,
-                  contextWindow: data.context_window,
-                  cost: data.cost,
-                  workspace: data.workspace,
-                });
-              }
-            }
+            queueStatusUpdate({
+              sessionId,
+              model: data.model,
+              contextWindow: data.context_window,
+              cost: data.cost,
+              workspace: data.workspace,
+            });
           } else {
             console.warn('[ClaudeIdeBridge] STATUS_UPDATE without sessionId');
           }
@@ -648,6 +685,12 @@ export async function startClaudeIdeBridge(
     },
     dispose(): void {
       deleteLockFile(port);
+      if (statusUpdateFlushTimer) {
+        clearTimeout(statusUpdateFlushTimer);
+        statusUpdateFlushTimer = null;
+      }
+      pendingStatusUpdates.clear();
+      lastStatusUpdateSentAt.clear();
       ipcMain.removeListener(IPC_CHANNELS.MCP_SELECTION_CHANGED, onSelectionChanged);
       ipcMain.removeListener(IPC_CHANNELS.MCP_AT_MENTIONED, onAtMentioned);
       try {
