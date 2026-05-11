@@ -1,6 +1,6 @@
 import type { AgentTask } from '@shared/types';
 import { Clock, Folder } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { TaskStatusBadge } from './TaskStatusBadge';
 
@@ -31,6 +31,15 @@ function formatTime(timestamp: number): string {
 
 function AgentTaskItemComponent({ task, onClick }: AgentTaskItemProps) {
   const isClickable = !!onClick;
+
+  // Tick every second while running to keep duration updated
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (task.status !== 'running') return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [task.status]);
+
   const duration = task.completedAt
     ? task.completedAt - task.startedAt
     : Date.now() - task.startedAt;
