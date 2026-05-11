@@ -1,5 +1,6 @@
 import type { AgentTask } from '@shared/types';
 import { Clock, Folder } from 'lucide-react';
+import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { TaskStatusBadge } from './TaskStatusBadge';
 
@@ -28,7 +29,7 @@ function formatTime(timestamp: number): string {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function AgentTaskItem({ task, onClick }: AgentTaskItemProps) {
+function AgentTaskItemComponent({ task, onClick }: AgentTaskItemProps) {
   const isClickable = !!onClick;
   const duration = task.completedAt
     ? task.completedAt - task.startedAt
@@ -82,3 +83,5 @@ export function AgentTaskItem({ task, onClick }: AgentTaskItemProps) {
     </button>
   );
 }
+
+export const AgentTaskItem = memo(AgentTaskItemComponent);

@@ -6,6 +6,7 @@ import { loadJSON, normalizePath, pathsEqual, saveJSON } from '@/App/storage';
 import type { Session } from '@/components/chat/SessionBar';
 import { useAgentSessionsStore } from './agentSessions';
 import { useAgentStatusStore } from './agentStatus';
+import { areAgentTaskRecordsEqual } from './agentTasksEquality';
 import { type AgentActivityState, useWorktreeActivityStore } from './worktreeActivity';
 
 const TASK_DESCRIPTIONS_STORAGE_KEY = 'enso-agent-task-descriptions';
@@ -322,6 +323,10 @@ export const useAgentTasksStore = create<AgentTasksState>()(
           };
         }
 
+        if (areAgentTaskRecordsEqual(state.tasks, newTasks)) {
+          return state;
+        }
+
         const derived = computeDerivedArrays(newTasks);
         return { tasks: newTasks, ...derived };
       });
@@ -503,6 +508,10 @@ function extractWaitingReason(toolInput: string): string | undefined {
  * Load a snapshot of tasks (used by the agent task panel window to initialize state).
  */
 export function loadSnapshot(tasks: Record<string, AgentTask>): void {
+  if (areAgentTaskRecordsEqual(useAgentTasksStore.getState().tasks, tasks)) {
+    return;
+  }
+
   const derived = computeDerivedArrays(tasks);
   useAgentTasksStore.setState({
     tasks,

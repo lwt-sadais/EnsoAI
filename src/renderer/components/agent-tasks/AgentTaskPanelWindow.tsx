@@ -1,17 +1,17 @@
 import type { AgentTask } from '@shared/types';
 import { ListTodo, RotateCcw, X } from 'lucide-react';
-import { useCallback, useEffect } from 'react';
+import { type CSSProperties, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useI18n } from '@/i18n';
-import {
-  initAgentTaskPanelListeners,
-  loadSnapshot,
-  useAgentTasksStore
-} from '@/stores/agentTasks';
+import { initAgentTaskPanelListeners, loadSnapshot, useAgentTasksStore } from '@/stores/agentTasks';
 import { AgentTaskList } from './AgentTaskList';
+import { getAgentTaskPanelHeaderClassName, isMacPlatform } from './agentTaskPanelTitleBar';
 
-const isMac = window.electronAPI.env.platform === 'darwin';
+const platform = window.electronAPI.env.platform;
+const isMac = isMacPlatform(platform);
+const dragRegionStyle = { WebkitAppRegion: 'drag' } as CSSProperties;
+const noDragRegionStyle = { WebkitAppRegion: 'no-drag' } as CSSProperties;
 
 export function AgentTaskPanelWindow() {
   const { t } = useI18n();
@@ -29,18 +29,16 @@ export function AgentTaskPanelWindow() {
 
   // Listen for snapshot response
   useEffect(() => {
-    return window.electronAPI.agentTaskPanel.onSnapshotResponse(
-      (snapshot) => {
-        loadSnapshot(snapshot as Record<string, AgentTask>);
-      }
-    );
+    return window.electronAPI.agentTaskPanel.onSnapshotResponse((snapshot) => {
+      loadSnapshot(snapshot as Record<string, AgentTask>);
+    });
   }, []);
 
   const handleTaskClick = useCallback((task: AgentTask) => {
     window.electronAPI.agentTaskPanel.navigateToSession({
       sessionId: task.sessionId,
       repoPath: task.repoPath,
-      cwd: task.cwd
+      cwd: task.cwd,
     });
   }, []);
 
@@ -54,11 +52,8 @@ export function AgentTaskPanelWindow() {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      {/* Header bar - draggable on Windows/Linux */}
-      <div
-        className="flex h-9 shrink-0 items-center justify-between border-b px-3 select-none"
-        style={isMac ? undefined : { WebkitAppRegion: 'drag' } as React.CSSProperties}
-      >
+      {/* Header bar - draggable title area */}
+      <div className={getAgentTaskPanelHeaderClassName(platform)} style={dragRegionStyle}>
         <div className="flex items-center gap-2">
           <ListTodo className="h-4 w-4" />
           <span className="text-sm font-medium">{t('Agent Tasks')}</span>
@@ -68,10 +63,7 @@ export function AgentTaskPanelWindow() {
             </span>
           )}
         </div>
-        <div
-          className="flex items-center gap-1"
-          style={isMac ? undefined : { WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
+        <div className="flex items-center gap-1" style={noDragRegionStyle}>
           <Button
             variant="ghost"
             size="icon"
