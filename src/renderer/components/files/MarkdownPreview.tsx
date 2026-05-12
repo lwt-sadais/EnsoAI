@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { Components } from 'react-markdown';
 import Markdown from 'react-markdown';
+import rehypeSlug from 'rehype-slug';
 import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import { CodeBlock } from '@/components/ui/code-block';
@@ -120,17 +121,20 @@ function createMarkdownComponents(markdownFilePath: string, rootPath?: string): 
         {children}
       </li>
     ),
-    a: ({ children, href, ...props }) => (
-      <a
-        className="text-primary underline underline-offset-4 hover:text-primary/80"
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        {...props}
-      >
-        {children}
-      </a>
-    ),
+    a: ({ children, href, ...props }) => {
+      const isAnchorLink = href?.startsWith('#');
+      return (
+        <a
+          className="text-primary underline underline-offset-4 hover:text-primary/80"
+          href={href}
+          target={isAnchorLink ? undefined : '_blank'}
+          rel={isAnchorLink ? undefined : 'noopener noreferrer'}
+          {...props}
+        >
+          {children}
+        </a>
+      );
+    },
     table: ({ children, ...props }) => (
       <div className="my-4 overflow-x-auto">
         <table className="w-full border-collapse border border-border" {...props}>
@@ -213,7 +217,11 @@ export function MarkdownPreview({ content, filePath, rootPath }: MarkdownPreview
 
   return (
     <div className="p-4 text-sm text-foreground select-text">
-      <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={components}>
+      <Markdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeSlug]}
+        components={components}
+      >
         {content}
       </Markdown>
     </div>
