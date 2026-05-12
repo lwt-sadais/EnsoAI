@@ -111,6 +111,13 @@ export default function App() {
     return initAgentTasksListener();
   }, []);
 
+  // Request notification permission on macOS for dock badge (setBadgeCount requires it)
+  useEffect(() => {
+    if (navigator.platform.startsWith('Mac') && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   // Listen for auto-fetch completion events to refresh git status
   useAutoFetchListener();
 

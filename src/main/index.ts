@@ -69,28 +69,38 @@ const FORCE_EXIT_TIMEOUT_MS = 8000;
 
 /**
  * Create a badge overlay icon with a number for Windows taskbar.
- * Returns a NativeImage (32x32) suitable for setOverlayIcon.
+ * Uses renderer Canvas to draw PNG (nativeImage does not support SVG).
+ * Returns a NativeImage (16x16) suitable for setOverlayIcon.
  */
-function createBadgeOverlayIcon(count: number): Electron.NativeImage {
-  const size = 32;
+async function createBadgeOverlayIcon(count: number): Promise<Electron.NativeImage> {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return nativeImage.createEmpty();
+  }
 
-  // Draw badge using SVG → data URL → NativeImage
+  const size = 16;
   const displayCount = count > 99 ? '99+' : String(count);
-  const fontSize = displayCount.length > 2 ? 14 : 16;
+  const fontSize = displayCount.length > 2 ? 9 : 11;
 
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="16" cy="16" r="14" fill="#0078D4"/>
-      <text x="16" y="16" text-anchor="middle" dominant-baseline="central"
-            fill="white" font-family="Segoe UI, sans-serif" font-size="${fontSize}" font-weight="bold">
-        ${displayCount}
-      </text>
-    </svg>
-  `.trim();
+  const pngDataUrl = await mainWindow.webContents.executeJavaScript(`
+    (function() {
+      const canvas = document.createElement('canvas');
+      canvas.width = ${size};
+      canvas.height = ${size};
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#0078D4';
+      ctx.beginPath();
+      ctx.arc(${size / 2}, ${size / 2}, ${size / 2 - 1}, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'white';
+      ctx.font = 'bold ${fontSize}px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('${displayCount}', ${size / 2}, ${size / 2});
+      return canvas.toDataURL('image/png');
+    })()
+  `);
 
-  const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
-  const image = nativeImage.createFromDataURL(svgDataUrl);
-  return image.resize({ width: size, height: size });
+  return nativeImage.createFromDataURL(pngDataUrl);
 }
 
 function sanitizeProfileName(input: string): string {
@@ -725,12 +735,15 @@ app.whenReady().then(async () => {
   });
 
   // Set badge count (macOS dock badge / Windows taskbar overlay icon)
-  ipcMain.handle(IPC_CHANNELS.SET_BADGE_COUNT, (_event, count: number) => {
+  ipcMain.handle(IPC_CHANNELS.SET_BADGE_COUNT, async (_event, count: number) => {
     if (process.platform === 'darwin') {
-      app.setBadgeCount(count > 0 ? count : 0);
+      const success = app.setBadgeCount(count > 0 ? count : 0);
+      if (!success) {
+        log.warn('[Badge] setBadgeCount failed — notification permission may not be granted');
+      }
     } else if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
       if (count > 0) {
-        const icon = createBadgeOverlayIcon(count);
+        const icon = await createBadgeOverlayIcon(count);
         mainWindow.setOverlayIcon(icon, `${count} completed tasks`);
       } else {
         mainWindow.setOverlayIcon(null, 'No completed tasks');
