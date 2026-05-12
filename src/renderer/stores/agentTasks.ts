@@ -2,11 +2,10 @@ import type { AgentTask, AgentTaskStatus } from '@shared/types';
 import { getPathBasename } from '@shared/utils/path';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import { loadJSON, normalizePath, pathsEqual, saveJSON } from '@/App/storage';
+import { loadJSON, pathsEqual, saveJSON } from '@/App/storage';
 import type { Session } from '@/components/chat/SessionBar';
 import { useAgentSessionsStore } from './agentSessions';
 import { areAgentTaskRecordsEqual } from './agentTasksEquality';
-import { type AgentActivityState, useWorktreeActivityStore } from './worktreeActivity';
 
 const TASK_DESCRIPTIONS_STORAGE_KEY = 'enso-agent-task-descriptions';
 const PANEL_POSITION_STORAGE_KEY = 'enso-agent-task-panel-position';
@@ -19,20 +18,6 @@ function loadDescriptions(): Record<string, string> {
 
 function saveDescriptions(descriptions: Record<string, string>) {
   saveJSON(TASK_DESCRIPTIONS_STORAGE_KEY, descriptions);
-}
-
-// Map worktreeActivity state to AgentTaskStatus
-function mapActivityToTaskStatus(activityState: AgentActivityState): AgentTaskStatus {
-  switch (activityState) {
-    case 'running':
-      return 'running';
-    case 'waiting_input':
-      return 'waiting';
-    case 'completed':
-      return 'completed';
-    default:
-      return 'idle';
-  }
 }
 
 interface AgentTasksState {
@@ -287,32 +272,20 @@ export const useAgentTasksStore = create<AgentTasksState>()(
 
     syncFromSessions: () => {
       const sessions = useAgentSessionsStore.getState().sessions;
-      const activityStates = useWorktreeActivityStore.getState().activityStates;
 
       set((state) => {
         const newTasks: Record<string, AgentTask> = {};
 
-        // Pre-build normalized activity map for O(1) lookup
-        const normalizedActivityMap = new Map<string, AgentActivityState>();
-        for (const [key, val] of Object.entries(activityStates)) {
-          normalizedActivityMap.set(normalizePath(key), val);
-        }
-
         for (const session of sessions) {
-          const normalizedCwd = normalizePath(session.cwd);
-          const activityState = normalizedActivityMap.get(normalizedCwd) ?? 'idle';
-
           const existingTask = state.tasks[session.id];
           const startTime = state.startTimes[session.id];
           const completionTime = state.completionTimes[session.id];
           const waitingReason = state.waitingReasons[session.id];
           const persistedDescription = state.descriptions[session.id];
 
-          const derivedStatus = mapActivityToTaskStatus(activityState);
-
-          // Preserve status from direct event handlers (PreToolUse, AskUserQuestion, Stop)
-          // Only use derived status for new tasks (first-time creation)
-          const finalStatus = existingTask ? existingTask.status : derivedStatus;
+          // Preserve status from direct event handlers (PreToolUse, AskUserQuestion, Stop).
+          // New tasks start as 'idle' until the first event arrives.
+          const finalStatus = existingTask ? existingTask.status : 'idle';
 
           newTasks[session.id] = {
             sessionId: session.id,
@@ -334,8 +307,7 @@ export const useAgentTasksStore = create<AgentTasksState>()(
 
         const derived = computeDerivedArrays(newTasks);
 
-        // Sync can add completed tasks (new sessions in completed state)
-        // or remove them (sessions deleted). Update badge if count changed.
+        // Update badge if completed count changed (sessions added/removed)
         const prevCompletedCount = state._completedTasksCache.length;
         const newCompletedCount = derived._completedTasksCache.length;
         if (prevCompletedCount !== newCompletedCount) {
@@ -385,21 +357,13 @@ function findSessionByNotification(
 
 /**
  * Initialize agent tasks listener.
- * Subscribes to session and activity state changes to keep tasks in sync.
+ * Subscribes to session changes and agent hook notifications to keep tasks in sync.
  * Call this once on app startup.
  */
 export function initAgentTasksListener(): () => void {
   // Sync when sessions change
   const unsubSessions = useAgentSessionsStore.subscribe(
     (state) => state.sessions,
-    () => {
-      useAgentTasksStore.getState().syncFromSessions();
-    }
-  );
-
-  // Sync when activity states change
-  const unsubActivity = useWorktreeActivityStore.subscribe(
-    (state) => state.activityStates,
     () => {
       useAgentTasksStore.getState().syncFromSessions();
     }
@@ -478,7 +442,6 @@ export function initAgentTasksListener(): () => void {
 
   return () => {
     unsubSessions();
-    unsubActivity();
     unsubPreToolUse();
     unsubStop();
     unsubAsk();
