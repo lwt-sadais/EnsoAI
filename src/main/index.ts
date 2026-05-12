@@ -52,6 +52,7 @@ import { checkGitInstalled } from './services/git/checkGit';
 import { gitAutoFetchService } from './services/git/GitAutoFetchService';
 import { setCurrentLocale } from './services/i18n';
 import { buildAppMenu } from './services/MenuBuilder';
+import { autoUpdaterService } from './services/updater/AutoUpdater';
 import { webInspectorServer } from './services/webInspector';
 import log, { initLogger } from './utils/logger';
 import { destroyAgentTaskPanelWindow } from './windows/AgentTaskPanelWindow';
@@ -751,6 +752,11 @@ app.on('window-all-closed', () => {
 // Cleanup before app quits (covers all quit methods: Cmd+Q, window close, etc.)
 app.on('will-quit', (event) => {
   if (isQuittingCleanupRunning) {
+    return;
+  }
+
+  // Skip cleanup for update restart — let electron-updater handle the quit flow
+  if (autoUpdaterService.isQuittingForUpdate()) {
     return;
   }
 
