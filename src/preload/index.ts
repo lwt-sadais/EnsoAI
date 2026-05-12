@@ -417,6 +417,8 @@ const electronAPI = {
   // App
   app: {
     getPath: (name: string): Promise<string> => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_PATH, name),
+    setBadgeCount: (count: number): Promise<void> =>
+      ipcRenderer.invoke(IPC_CHANNELS.SET_BADGE_COUNT, count),
     onUpdateAvailable: (callback: (info: unknown) => void): (() => void) => {
       const handler = (_: unknown, info: unknown) => callback(info);
       ipcRenderer.on(IPC_CHANNELS.APP_UPDATE_AVAILABLE, handler);
@@ -729,9 +731,7 @@ const electronAPI = {
     },
     getSnapshot: (): Promise<boolean | null> =>
       ipcRenderer.invoke(IPC_CHANNELS.AGENT_TASK_GET_SNAPSHOT),
-    onSnapshotResponse: (
-      callback: (snapshot: Record<string, unknown>) => void
-    ): (() => void) => {
+    onSnapshotResponse: (callback: (snapshot: Record<string, unknown>) => void): (() => void) => {
       const handler = (_: unknown, snapshot: Record<string, unknown>) => callback(snapshot);
       ipcRenderer.on(IPC_CHANNELS.AGENT_TASK_SNAPSHOT_RESPONSE, handler);
       return () => ipcRenderer.off(IPC_CHANNELS.AGENT_TASK_SNAPSHOT_RESPONSE, handler);
@@ -739,10 +739,8 @@ const electronAPI = {
     onNavigateToSession: (
       callback: (params: { sessionId: string; repoPath: string; cwd: string }) => void
     ): (() => void) => {
-      const handler = (
-        _: unknown,
-        params: { sessionId: string; repoPath: string; cwd: string }
-      ) => callback(params);
+      const handler = (_: unknown, params: { sessionId: string; repoPath: string; cwd: string }) =>
+        callback(params);
       ipcRenderer.on(IPC_CHANNELS.AGENT_TASK_NAVIGATE_TO_SESSION, handler);
       return () => ipcRenderer.off(IPC_CHANNELS.AGENT_TASK_NAVIGATE_TO_SESSION, handler);
     },

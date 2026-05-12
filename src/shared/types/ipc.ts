@@ -278,6 +278,9 @@ export const IPC_CHANNELS = {
   AGENT_TASK_PANEL_RESET_BOUNDS: 'agent-task:panel:resetBounds',
   AGENT_TASK_SYNC: 'agent-task:sync',
 
+  // Badge
+  SET_BADGE_COUNT: 'app:setBadgeCount',
+
   // Logging
   LOG_UPDATE_CONFIG: 'log:update-config',
   LOG_OPEN_FOLDER: 'log:open-folder',

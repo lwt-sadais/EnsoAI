@@ -5,7 +5,7 @@ import { electronApp, optimizer } from '@electron-toolkit/utils';
 import { type Locale, normalizeLocale } from '@shared/i18n';
 import { IPC_CHANNELS, type ProxySettings } from '@shared/types';
 import { customProtocolUriToPath, type SupportedFileUrlPlatform } from '@shared/utils/fileUrl';
-import { app, BrowserWindow, ipcMain, Menu, net, protocol } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, net, protocol } from 'electron';
 
 // Register custom protocol privileges
 protocol.registerSchemesAsPrivileged([
@@ -37,11 +37,11 @@ import {
   cleanupAllResourcesSync,
   registerIpcHandlers,
 } from './ipc';
+import { registerAgentTaskPanelHandlers } from './ipc/agentTaskPanel';
 import { initClaudeProviderWatcher } from './ipc/claudeProvider';
 import { cleanupTempFiles } from './ipc/files';
 import { readSettings } from './ipc/settings';
 import { registerWindowHandlers } from './ipc/window';
-import { registerAgentTaskPanelHandlers } from './ipc/agentTaskPanel';
 import { registerClaudeBridgeIpcHandlers } from './services/claude/ClaudeIdeBridge';
 import { unwatchClaudeSettings } from './services/claude/ClaudeProviderManager';
 import {
@@ -54,8 +54,8 @@ import { setCurrentLocale } from './services/i18n';
 import { buildAppMenu } from './services/MenuBuilder';
 import { webInspectorServer } from './services/webInspector';
 import log, { initLogger } from './utils/logger';
-import { createMainWindow } from './windows/MainWindow';
 import { destroyAgentTaskPanelWindow } from './windows/AgentTaskPanelWindow';
+import { createMainWindow } from './windows/MainWindow';
 
 let mainWindow: BrowserWindow | null = null;
 let pendingOpenPath: string | null = null;
@@ -65,6 +65,32 @@ let isQuittingCleanupRunning = false;
 
 const isDev = !app.isPackaged;
 const FORCE_EXIT_TIMEOUT_MS = 8000;
+
+/**
+ * Create a badge overlay icon with a number for Windows taskbar.
+ * Returns a NativeImage (32x32) suitable for setOverlayIcon.
+ */
+function createBadgeOverlayIcon(count: number): Electron.NativeImage {
+  const size = 32;
+
+  // Draw badge using SVG → data URL → NativeImage
+  const displayCount = count > 99 ? '99+' : String(count);
+  const fontSize = displayCount.length > 2 ? 14 : 16;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="16" cy="16" r="14" fill="#0078D4"/>
+      <text x="16" y="16" text-anchor="middle" dominant-baseline="central"
+            fill="white" font-family="Segoe UI, sans-serif" font-size="${fontSize}" font-weight="bold">
+        ${displayCount}
+      </text>
+    </svg>
+  `.trim();
+
+  const svgDataUrl = `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  const image = nativeImage.createFromDataURL(svgDataUrl);
+  return image.resize({ width: size, height: size });
+}
 
 function sanitizeProfileName(input: string): string {
   const trimmed = input.trim();
@@ -695,6 +721,20 @@ app.whenReady().then(async () => {
       onNewWindow: handleNewWindow,
     });
     Menu.setApplicationMenu(updatedMenu);
+  });
+
+  // Set badge count (macOS dock badge / Windows taskbar overlay icon)
+  ipcMain.handle(IPC_CHANNELS.SET_BADGE_COUNT, (_event, count: number) => {
+    if (process.platform === 'darwin') {
+      app.setBadgeCount(count > 0 ? count : 0);
+    } else if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+      if (count > 0) {
+        const icon = createBadgeOverlayIcon(count);
+        mainWindow.setOverlayIcon(icon, `${count} completed tasks`);
+      } else {
+        mainWindow.setOverlayIcon(null, 'No completed tasks');
+      }
+    }
   });
 
   app.on('activate', () => {

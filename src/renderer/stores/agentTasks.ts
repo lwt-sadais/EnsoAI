@@ -174,6 +174,12 @@ export const useAgentTasksStore = create<AgentTasksState>()(
 
         const derived = computeDerivedArrays(newTasks);
 
+        // Notify main process to update badge count when a task completes
+        if (status === 'completed') {
+          const completedCount = derived._completedTasksCache.length;
+          window.electronAPI.app.setBadgeCount(completedCount);
+        }
+
         return {
           tasks: newTasks,
           startTimes: newStartTimes,
@@ -214,6 +220,8 @@ export const useAgentTasksStore = create<AgentTasksState>()(
 
     clearTask: (sessionId) => {
       set((state) => {
+        const task = state.tasks[sessionId];
+
         const { [sessionId]: _, ...restTasks } = state.tasks;
         const { [sessionId]: __, ...restStartTimes } = state.startTimes;
         const { [sessionId]: ___, ...restCompletionTimes } = state.completionTimes;
@@ -221,6 +229,13 @@ export const useAgentTasksStore = create<AgentTasksState>()(
         const { [sessionId]: _____, ...restDescriptions } = state.descriptions;
         saveDescriptions(restDescriptions);
         const derived = computeDerivedArrays(restTasks);
+
+        // If the removed task was completed, decrement badge count
+        if (task?.status === 'completed') {
+          const completedCount = derived._completedTasksCache.length;
+          window.electronAPI.app.setBadgeCount(completedCount);
+        }
+
         return {
           tasks: restTasks,
           startTimes: restStartTimes,
@@ -255,6 +270,10 @@ export const useAgentTasksStore = create<AgentTasksState>()(
         saveDescriptions(newDescriptions);
 
         const derived = computeDerivedArrays(newTasks);
+
+        // Reset badge count when completed tasks are cleared
+        window.electronAPI.app.setBadgeCount(0);
+
         return {
           tasks: newTasks,
           startTimes: newStartTimes,
@@ -314,6 +333,15 @@ export const useAgentTasksStore = create<AgentTasksState>()(
         }
 
         const derived = computeDerivedArrays(newTasks);
+
+        // Sync can add completed tasks (new sessions in completed state)
+        // or remove them (sessions deleted). Update badge if count changed.
+        const prevCompletedCount = state._completedTasksCache.length;
+        const newCompletedCount = derived._completedTasksCache.length;
+        if (prevCompletedCount !== newCompletedCount) {
+          window.electronAPI.app.setBadgeCount(newCompletedCount);
+        }
+
         return { tasks: newTasks, ...derived };
       });
     },
@@ -495,6 +523,9 @@ export function loadSnapshot(tasks: Record<string, AgentTask>): void {
     tasks,
     ...derived,
   });
+
+  // Update badge to reflect snapshot state
+  window.electronAPI.app.setBadgeCount(derived._completedTasksCache.length);
 }
 
 /**
