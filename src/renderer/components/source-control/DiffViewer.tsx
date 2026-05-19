@@ -792,10 +792,11 @@ export function DiffViewer({
         for (const d of disposables) {
           d.dispose();
         }
-        // Prevent commit-view Monaco models from accumulating in memory.
-        // We intentionally keep worktree models cached for performance, but commit history
-        // can generate many unique models (commitHash scoped URIs), so dispose on unmount.
-        if (isCommitView && mountedModels) {
+        // Dispose models on unmount to prevent stale content from being
+        // served by getModel(uri) when the same file is viewed again later
+        // (e.g., after commit + re-modify). Without this, the global model
+        // registry caches the old content and @monaco-editor/react reuses it.
+        if (mountedModels) {
           mountedModels.original?.dispose();
           mountedModels.modified?.dispose();
         }
@@ -1275,9 +1276,6 @@ export function DiffViewer({
                 enabled: hideUnchangedRegions,
               },
             }}
-            // Prevent library from disposing models before DiffEditorWidget resets
-            keepCurrentOriginalModel
-            keepCurrentModifiedModel
           />
         )}
       </div>
