@@ -88,7 +88,7 @@ export function useEditor() {
       if (existingTab) {
         setActiveFile(path);
         // Background refresh to pick up external modifications
-        refreshFileContent(path);
+        await refreshFileContent(path);
       } else {
         try {
           const { content, encoding, isBinary } = await window.electronAPI.file.read(path);

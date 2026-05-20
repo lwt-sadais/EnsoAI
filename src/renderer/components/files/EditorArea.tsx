@@ -477,6 +477,20 @@ export const EditorArea = forwardRef<EditorAreaRef, EditorAreaProps>(function Ed
 
   // Listen for external file changes and update open tabs
   useEffect(() => {
+    // Ensure a file watcher is active for the root directory of open tabs.
+    // The watcher is keyed by (webContents.id, dirPath), so duplicate watchStart
+    // calls are no-ops. We only start — never stop — to avoid interfering with
+    // watchers managed by useFileTree / useSharedFileWatch.
+    const watchedDirs = new Set<string>();
+    for (const tab of tabsRef.current) {
+      const lastSlash = tab.path.lastIndexOf('/');
+      const dir = lastSlash > 0 ? tab.path.substring(0, lastSlash) : null;
+      if (dir && !watchedDirs.has(dir)) {
+        watchedDirs.add(dir);
+        void window.electronAPI.file.watchStart(dir);
+      }
+    }
+
     // Debounce timers keyed by file path to prevent concurrent reloads of the same file.
     // Needed because Claude CLI atomic writes (tmp + rename) can fire multiple rapid events.
     const reloadTimers = new Map<string, ReturnType<typeof setTimeout>>();

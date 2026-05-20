@@ -209,10 +209,10 @@ export function CurrentFilePanel({ rootPath, isActive = false }: CurrentFilePane
 
   // Handle tab click
   const handleTabClick = useCallback(
-    (path: string) => {
+    async (path: string) => {
       setActiveFile(path);
       // Background refresh to pick up external modifications
-      refreshFileContent(path);
+      await refreshFileContent(path);
     },
     [setActiveFile, refreshFileContent]
   );
