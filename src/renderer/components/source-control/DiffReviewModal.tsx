@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useEditor } from '@/hooks/useEditor';
 import { useFileChanges, useFileDiff } from '@/hooks/useSourceControl';
 import { useSubmoduleChanges, useSubmoduleFileDiff, useSubmodules } from '@/hooks/useSubmodules';
 import { useI18n } from '@/i18n';
@@ -166,6 +167,7 @@ interface SubmoduleGroupProps {
   onToggle: () => void;
   selectedFile: ExtendedFileChange | null;
   onSelectFile: (file: ExtendedFileChange) => void;
+  onOpenFile: (filePath: string) => void;
   allComments: CommentData[];
 }
 
@@ -176,6 +178,7 @@ function SubmoduleGroup({
   onToggle,
   selectedFile,
   onSelectFile,
+  onOpenFile,
   allComments,
 }: SubmoduleGroupProps) {
   const { data: changes } = useSubmoduleChanges(rootPath, submodule.path);
@@ -234,6 +237,7 @@ function SubmoduleGroup({
                   isSelected && 'bg-accent'
                 )}
                 onClick={() => onSelectFile(extendedFile)}
+                onDoubleClick={() => onOpenFile(`${submodule.path}/${file.path}`)}
               >
                 <FileCode className={cn('h-4 w-4 shrink-0', getStatusColor(file.status))} />
                 <span className="flex-1 truncate">{file.path.split('/').pop()}</span>
@@ -292,6 +296,7 @@ export function DiffReviewModal({ open, onOpenChange, rootPath, onSend }: DiffRe
   const { t } = useI18n();
   const sessionId = useActiveSessionId(rootPath);
   const { terminalTheme, editorSettings } = useSettingsStore();
+  const { navigateToFile } = useEditor();
   const write = useTerminalWriteStore((state) => state.write);
   const focus = useTerminalWriteStore((state) => state.focus);
 
@@ -495,6 +500,17 @@ export function DiffReviewModal({ open, onOpenChange, rootPath, onSend }: DiffRe
       setHideUnchangedRegions(newValue);
     }
   }, [hideUnchangedRegions]);
+
+  // Open file in editor on double-click
+  const handleOpenFile = useCallback(
+    (filePath: string) => {
+      if (!rootPath) return;
+      const absolutePath = `${rootPath}/${filePath}`;
+      onOpenChange(false);
+      navigateToFile(absolutePath);
+    },
+    [rootPath, onOpenChange, navigateToFile]
+  );
 
   // Handle add comment (store locally, not send immediately)
   const handleAddComment = useCallback(
@@ -1094,6 +1110,7 @@ export function DiffReviewModal({ open, onOpenChange, rootPath, onSend }: DiffRe
                             'bg-accent'
                         )}
                         onClick={() => setSelectedFile(file)}
+                        onDoubleClick={() => handleOpenFile(file.path)}
                       >
                         <FileCode className={cn('h-4 w-4 shrink-0', getStatusColor(file.status))} />
                         <span className="flex-1 truncate">{file.path.split('/').pop()}</span>
@@ -1122,6 +1139,7 @@ export function DiffReviewModal({ open, onOpenChange, rootPath, onSend }: DiffRe
                       onToggle={() => toggleSubmodule(submodule.path)}
                       selectedFile={selectedFile}
                       onSelectFile={setSelectedFile}
+                      onOpenFile={handleOpenFile}
                       allComments={allComments}
                     />
                   ))}
