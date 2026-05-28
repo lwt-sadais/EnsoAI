@@ -113,7 +113,11 @@ export default function App() {
 
   // Request notification permission on macOS for dock badge (setBadgeCount requires it)
   useEffect(() => {
-    if (navigator.platform.startsWith('Mac') && 'Notification' in window && Notification.permission === 'default') {
+    if (
+      navigator.platform.startsWith('Mac') &&
+      'Notification' in window &&
+      Notification.permission === 'default'
+    ) {
       Notification.requestPermission();
     }
   }, []);
@@ -224,6 +228,20 @@ export default function App() {
     getStoredBoolean(STORAGE_KEYS.FILE_SIDEBAR_COLLAPSED, false)
   );
 
+  // Sync group selection to match the target repository's group
+  const syncGroupForRepo = useCallback(
+    (repoPath: string) => {
+      const targetRepo = repositories.find((r) => r.path === repoPath);
+      if (!targetRepo) return;
+      // If the repo belongs to a group and current group is not "All" and doesn't match, switch
+      const targetGroupId = targetRepo.groupId || ALL_GROUP_ID;
+      if (activeGroupId !== ALL_GROUP_ID && activeGroupId !== targetGroupId) {
+        handleSwitchGroup(targetGroupId);
+      }
+    },
+    [repositories, activeGroupId, handleSwitchGroup]
+  );
+
   const { refreshGitData, handleSelectWorktree } = useWorktreeSelection(
     activeWorktree,
     setActiveWorktree,
@@ -233,7 +251,8 @@ export default function App() {
     activeTab,
     setActiveTab,
     selectedRepo,
-    setSelectedRepo
+    setSelectedRepo,
+    syncGroupForRepo
   );
 
   const {
@@ -475,7 +494,7 @@ export default function App() {
   );
 
   useGroupSync(hideGroups, activeGroupId, setActiveGroupId, saveActiveGroupId);
-  useOpenPathListener(repositories, saveRepositories, setSelectedRepo);
+  useOpenPathListener(repositories, saveRepositories, setSelectedRepo, syncGroupForRepo);
   useFocusSession({
     onSwitchWorktree: (path) => switchWorktreePathRef.current?.(path),
     onSwitchTab: handleTabChange,
@@ -530,6 +549,7 @@ export default function App() {
     }
 
     setSelectedRepo(repoPath);
+    syncGroupForRepo(repoPath);
     // Restore previously selected worktree for this repo
     const savedWorktreePath = repoWorktreeMap[repoPath];
     if (savedWorktreePath) {
@@ -669,6 +689,7 @@ export default function App() {
           const found = repoWorktrees.find((wt) => wt.path === worktreePath);
           if (found) {
             setSelectedRepo(repo.path);
+            syncGroupForRepo(repo.path);
             setActiveWorktree(found);
             const savedTab = worktreeTabMap[found.path] || 'chat';
             setActiveTab(savedTab);
@@ -690,6 +711,7 @@ export default function App() {
       setActiveTab,
       setActiveWorktree,
       setSelectedRepo,
+      syncGroupForRepo,
     ]
   );
 
@@ -714,9 +736,7 @@ export default function App() {
         addToast({
           type: 'warning',
           title: t('Task repository not found'),
-          description: t(
-            'The repository for this task has been removed. Task removed from list.'
-          ),
+          description: t('The repository for this task has been removed. Task removed from list.'),
         });
         return;
       }
@@ -761,7 +781,7 @@ export default function App() {
       useAgentSessionsStore.getState().setActiveId(task.repoPath, task.cwd, task.sessionId);
       handleTabChange('chat');
     },
-    [handleSwitchWorktreePath, handleTabChange, repositories, tempWorkspaces]
+    [handleSwitchWorktreePath, handleTabChange, repositories, tempWorkspaces, t]
   );
 
   // Listen for navigate-to-session requests from agent task panel window

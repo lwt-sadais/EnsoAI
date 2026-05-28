@@ -18,7 +18,8 @@ export function useWorktreeSelection(
   activeTab: TabId,
   setActiveTab: (tab: TabId) => void,
   selectedRepo: string | null,
-  setSelectedRepo: (repo: string) => void
+  setSelectedRepo: (repo: string) => void,
+  onRepoSwitch?: (repoPath: string) => void
 ) {
   const { t } = useI18n();
   const queryClient = useQueryClient();
@@ -125,6 +126,7 @@ export function useWorktreeSelection(
 
       if (nextRepoPath && nextRepoPath !== selectedRepo) {
         setSelectedRepo(nextRepoPath);
+        onRepoSwitch?.(nextRepoPath);
       }
 
       // Save current worktree's tab state before switching
@@ -157,6 +159,7 @@ export function useWorktreeSelection(
       setActiveWorktree,
       setWorktreeTabMap,
       setActiveTab,
+      onRepoSwitch,
     ]
   );
 
