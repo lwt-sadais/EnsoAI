@@ -480,6 +480,7 @@ export const zhTranslations: Record<string, string> = {
   'Worktree search placeholder': '搜索 worktree...',
   'Toggle Worktree': '折叠/展开 Worktree',
   'Toggle Repository': '折叠/展开 Repository',
+  'Toggle Agent Task Panel': '显示/隐藏 Agent 任务面板',
   'Tmux Session': 'Tmux 会话',
   'Wrap Claude agent in tmux for session persistence and recovery':
     '将 Claude agent 包装在 tmux 中以实现会话持久化与恢复',

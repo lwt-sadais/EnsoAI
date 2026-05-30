@@ -175,6 +175,13 @@ export function isAgentTaskPanelVisible(): boolean {
   return false;
 }
 
+export function isAgentTaskPanelFocused(): boolean {
+  if (agentTaskPanelWindow && !agentTaskPanelWindow.isDestroyed()) {
+    return agentTaskPanelWindow.isVisible() && agentTaskPanelWindow.isFocused();
+  }
+  return false;
+}
+
 export function resetAgentTaskPanelBounds(): void {
   if (agentTaskPanelWindow && !agentTaskPanelWindow.isDestroyed()) {
     agentTaskPanelWindow.setBounds(calcDefaultBounds());

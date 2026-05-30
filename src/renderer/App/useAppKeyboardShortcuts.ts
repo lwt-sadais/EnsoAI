@@ -10,6 +10,7 @@ interface UseAppKeyboardShortcutsOptions {
   onToggleWorktree: () => void;
   onToggleRepository: () => void;
   onSwitchActiveWorktree: () => void;
+  onToggleAgentTaskPanel: () => void;
 }
 
 // 判断是否应跳过快捷键处理（可编辑场景、IME、快捷键录制）
@@ -38,6 +39,7 @@ export function useAppKeyboardShortcuts({
   onToggleWorktree,
   onToggleRepository,
   onSwitchActiveWorktree,
+  onToggleAgentTaskPanel,
 }: UseAppKeyboardShortcutsOptions) {
   // Listen for Action Panel keyboard shortcut (Shift+Cmd+P)
   useEffect(() => {
@@ -125,4 +127,24 @@ export function useAppKeyboardShortcuts({
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [onToggleWorktree, onToggleRepository, onSwitchActiveWorktree]);
+
+  // Listen for global keybindings (agent task panel toggle, etc.)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip IME composition and keybinding recording
+      if (e.isComposing) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.hasAttribute('data-keybinding-recording')) return;
+
+      const bindings = useSettingsStore.getState().globalKeybindings;
+
+      if (bindings.toggleAgentTaskPanel && matchesKeybinding(e, bindings.toggleAgentTaskPanel)) {
+        e.preventDefault();
+        onToggleAgentTaskPanel();
+        return;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
+  }, [onToggleAgentTaskPanel]);
 }

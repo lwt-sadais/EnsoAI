@@ -93,6 +93,7 @@ export interface EditorKeybindings {
 
 export interface GlobalKeybindings {
   runningProjects: TerminalKeybinding;
+  toggleAgentTaskPanel: TerminalKeybinding;
 }
 
 export interface WorkspaceKeybindings {

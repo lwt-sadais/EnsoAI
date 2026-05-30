@@ -4,7 +4,7 @@ import { IPC_CHANNELS } from '@shared/types'
 import {
   showAgentTaskPanelWindow,
   hideAgentTaskPanelWindow,
-  isAgentTaskPanelVisible,
+  isAgentTaskPanelFocused,
   getAgentTaskPanelWindow,
   resetAgentTaskPanelBounds,
   setMainWindowRef
@@ -12,14 +12,14 @@ import {
 
 export function registerAgentTaskPanelHandlers(mainWindow: BrowserWindow): void {
   setMainWindowRef(mainWindow)
-  // Toggle panel visibility
+  // Toggle panel: hide if focused, show/focus if hidden or unfocused
   ipcMain.handle(IPC_CHANNELS.AGENT_TASK_PANEL_TOGGLE, () => {
-    if (isAgentTaskPanelVisible()) {
+    if (isAgentTaskPanelFocused()) {
       hideAgentTaskPanelWindow()
     } else {
       showAgentTaskPanelWindow()
     }
-    const visible = isAgentTaskPanelVisible()
+    const visible = isAgentTaskPanelFocused()
     // Notify main window of visibility change
     if (!mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IPC_CHANNELS.AGENT_TASK_PANEL_VISIBILITY_CHANGED, visible)

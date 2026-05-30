@@ -379,6 +379,10 @@ export default function App() {
       const nextWorktreePath = activeWorktreePaths[nextIndex];
       switchWorktreePathRef.current?.(nextWorktreePath);
     }, [activeWorktree?.path, switchWorktreePathRef.current]),
+    onToggleAgentTaskPanel: useCallback(
+      () => window.electronAPI.agentTaskPanel.toggle(),
+      []
+    ),
   });
 
   // Web Inspector: listen for element inspection data and write to active agent terminal

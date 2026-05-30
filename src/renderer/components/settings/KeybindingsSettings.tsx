@@ -132,6 +132,18 @@ export function KeybindingsSettings() {
               }}
             />
           </div>
+          <div className="grid grid-cols-[140px_1fr] items-center gap-4">
+            <span className="text-sm">{t('Toggle Agent Task Panel')}</span>
+            <KeybindingInput
+              value={globalKeybindings.toggleAgentTaskPanel ?? { key: '`', alt: true }}
+              onChange={(binding) => {
+                setGlobalKeybindings({
+                  ...globalKeybindings,
+                  toggleAgentTaskPanel: binding,
+                });
+              }}
+            />
+          </div>
         </div>
       </div>
 

@@ -333,6 +333,7 @@ export const defaultEditorKeybindings: EditorKeybindings = {
 
 export const defaultGlobalKeybindings: GlobalKeybindings = {
   runningProjects: { key: 'l', meta: true },
+  toggleAgentTaskPanel: { key: '`', alt: true },
 };
 
 export const defaultWorkspaceKeybindings: WorkspaceKeybindings = {
