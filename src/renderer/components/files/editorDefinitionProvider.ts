@@ -41,8 +41,10 @@ const DECLARATION_PATTERNS: Record<string, string[]> = {
   java: [
     // Type declarations
     '\\b(?:class|interface|enum|record|@interface)\\s+{W}\\b',
-    // Method declarations — require access modifier before return type
+    // Method declarations — with access modifier
     '(?:public|private|protected)(?:\\s+(?:static|final|abstract|synchronized|native|default))*\\s+[\\w<>\\[\\]]+(?:<[^>]*>)?\\s+{W}\\s*\\(',
+    // Method declarations — no access modifier (interface methods, default methods, package-private)
+    '\\b(?:static\\s+|final\\s+|abstract\\s+|synchronized\\s+|native\\s+|default\\s+)*[\\w<>\\[\\]]+(?:<[^>]*>)?\\s+{W}\\s*\\(',
     // Annotations
     '@interface\\s+{W}\\b',
   ],
