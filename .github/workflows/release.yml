@@ -133,7 +133,10 @@ jobs:
 
   build-win:
     needs: build-app
-    runs-on: windows-latest
+    # 用 windows-2025(VS2022) 而非 windows-latest(已切到 windows-2025-vs2026)，
+    # 因为 node-gyp@11.5.0 的 find-visualstudio.js 不识别 VS2026，会导致
+    # electron-builder install-app-deps 重建 @parcel/watcher 时报 "Could not find any Visual Studio installation to use"
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v4
 
