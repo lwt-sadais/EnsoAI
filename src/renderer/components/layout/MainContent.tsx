@@ -430,17 +430,15 @@ export function MainContent({
               </span>
             )}
           </button>
-          {activeSessionId && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsReviewModalOpen(true)}
-              className="h-8"
-            >
-              <MessageSquare className="h-4 w-4 mr-1.5" />
-              {t('Review')}
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsReviewModalOpen(true)}
+            className="h-8"
+          >
+            <MessageSquare className="h-4 w-4 mr-1.5" />
+            {t('Review')}
+          </Button>
           <OpenInMenu path={worktreePath} activeTab={activeTab} />
         </div>
       </header>
